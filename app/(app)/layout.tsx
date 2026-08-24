@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
+import { ExpenseStoreProvider } from '@/components/expenses/expense-store'
 import { BottomNav } from '@/components/shell/bottom-nav'
+import { ToastProvider } from '@/components/ui/toast'
 import { createClient } from '@/lib/supabase/server'
 
 type AppLayoutProps = {
@@ -25,18 +27,25 @@ export default async function AppLayout({ children, header, fab }: AppLayoutProp
   if (!user) redirect('/sign-in')
 
   return (
-    <div className="min-h-dvh">
-      {header}
-      <main
-        className="mx-auto max-w-content px-4 py-6"
-        style={{
-          paddingBottom: 'calc(var(--nav-height) + var(--space-12) + env(safe-area-inset-bottom))',
-        }}
-      >
-        {children}
-      </main>
-      {fab}
-      <BottomNav />
-    </div>
+    <ToastProvider>
+      {/* One optimistic queue for the shell: quick add lives in the FAB slot, a
+          sibling of the page, and both have to move at the same moment. */}
+      <ExpenseStoreProvider>
+        <div className="min-h-dvh">
+          {header}
+          <main
+            className="mx-auto max-w-content px-4 py-6"
+            style={{
+              paddingBottom:
+                'calc(var(--nav-height) + var(--space-12) + env(safe-area-inset-bottom))',
+            }}
+          >
+            {children}
+          </main>
+          {fab}
+          <BottomNav />
+        </div>
+      </ExpenseStoreProvider>
+    </ToastProvider>
   )
 }

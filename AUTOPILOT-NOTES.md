@@ -359,3 +359,215 @@ spread crossing a year end, and an odd amount over 7 months.
    `Mods & Parts`, `Track & Events` and `Tools & Garage` should be the three that do not.
 5. **Argue with `parseAmount`** if you want to. Type a few amounts the way you actually would
    and check `lib/money.test.ts` covers them.
+
+---
+
+## Phase 2 — Expenses end to end
+
+Branch: `feat/02-expenses` (the roadmap names this branch `feat/expenses`; as in the two
+phases before it, the branch already existed under the other name when the run started and
+was left alone).
+
+### What was built
+
+- **Quick add, in two taps.** A brick FAB in the shell's `@fab` slot opens a native
+  `<dialog>` bottom sheet with the amount field already focused, `inputmode="decimal"`, and
+  the parsed value echoed underneath as you type. Category chips sit directly beneath it,
+  ordered most-recently-used first by SQL, and Save closes the sheet. Everything else —
+  date, vehicle, merchant, note, bucket, budget impact, amortisation, odometer, photos — is
+  behind one **More** disclosure.
+- **The bucket and budget-impact model, wired to `lib/budget.ts`.** The bucket resolves from
+  the chip override, then the category default, then the vehicle; attaching a vehicle moves
+  an expense into a car bucket and removing it moves it back, because the database will not
+  store anything else. The switch underneath reads **"Counts toward August" / "Kept out of
+  August"**, named from the expense's own month rather than today's. Amortisation appears
+  inline, unselected, only when the amount clears the median of the last ninety days times
+  `profiles.amortise_suggest_multiplier` — a threshold computed by a view, not the browser.
+- **A ledger that pages by keyset and aggregates in SQL.** One `ledger_page` function does
+  the filtering (date range, category, bucket, vehicle, has-photo, amount range), the search
+  across note and merchant, the day subtotals, the attachment counts and the category and
+  vehicle joins, and returns one page ordered by `(occurred_on, created_at, id)` descending.
+  Rows are fixed-height and virtualised past forty. Filters live in the URL, so a filtered
+  ledger is a different server render rather than a client-side pass over downloaded rows.
+- **Optimistic everything, with undo on delete.** One `useOptimistic` queue lives in the
+  authenticated layout — not in the ledger — because quick add hangs off the FAB slot, a
+  sibling of the page, and an expense added there has to land in the ledger and move the
+  month figure in the same frame. The month figure moves by `impactInMonth` from
+  `lib/budget.ts`, the mirror of `v_expense_impact`, so an amortised expense contributes its
+  slice rather than its total. Delete is a hard delete with an Undo toast that puts the row
+  back under its original id and original `created_at`.
+- **Category management in Settings.** Create, rename, recolour from the token palette, pick
+  an icon from a ninety-glyph Phosphor catalogue, set the default bucket and default budget
+  impact with the same two controls the expense form uses, and archive with undo. There is
+  no delete: seeded categories are not deletable and an expense should not lose its category
+  because the category stopped being useful.
+
+### Proof it works
+
+`npm test` — 138 hermetic tests. `npm run test:db` — 66 against a database reset from zero,
+16 of them new in `lib/queries/ledger.db.test.ts` covering keyset paging with no repeats or
+drops, day subtotals staying whole across a page boundary, every filter, case-insensitive
+search, the amortisation remainder rule through `v_expense_impact`, the category ranking and
+the suggestion threshold.
+
+Beyond the test suite, the production build was driven over HTTP with a real magic-link
+session, including calling the Server Actions directly by their action ids:
+
+| Check | Result |
+|---|---|
+| `/today`, `/ledger`, `/settings`, `/settings/categories` render signed in | 200, no error markup |
+| Monthly figure with a 24-month spread and a kept-out 24m purchase | `335.000 dong` — 150.000 + 85.000 + 2.400.000/24 |
+| Day subtotals under `?bucket=car_project` and `?min=1000000` | narrow with the filter, as SQL computes them |
+| 120 expenses in the ledger | virtualised, spacers present, "Load older" offered |
+| `createExpenseAction` | row in the database under the client-generated id |
+| `updateExpenseAction` | amount and merchant changed |
+| `createExpenseAction` with amount 0 | `{ok:false, error:"Enter an amount"}` |
+| `createExpenseAction` with a car bucket and no vehicle | rejected by the schema |
+| `deleteExpenseAction` then `restoreExpenseAction` | gone, then back with the original `created_at` |
+| A second user calling delete and update on the first user's expense | zero rows affected, row untouched |
+
+### Assumptions
+
+1. **Zod does not ship to the browser.** `import { z } from 'zod'` imports a namespace object
+   that does not tree-shake; measured, it was **72KB gzipped** in the route bundles for
+   `/today` and `/ledger` — more than half the entire performance budget, for a ten-field
+   form. The schemas are still one per entity and still the only gate on a write: the Server
+   Actions parse with them, and the client imports `ExpenseWrite` and `CategoryWrite` as
+   **types only**, so the object it assembles cannot drift from what the server accepts. The
+   client checks the two things a person can actually get wrong (no amount, no date) for
+   instant feedback and lets the server answer for the rest. This is a deliberate departure
+   from the letter of CLAUDE.md section 2 in favour of section 1 point 2 and section 3.
+   `zod/mini` would let both be true; converting the schemas is a contained change.
+2. **Category icons are rendered on the server.** Rendering ninety Phosphor glyphs in the
+   settings picker client-side cost **81KB gzipped**. The catalogue is split in two —
+   `components/icons/catalog-names.ts` holds only strings, `catalog.tsx` holds the
+   components — and Server Components hand finished elements to the client as props. Same
+   pixels, no JavaScript. The ledger and the quick-add chips take their icons the same way.
+3. **Amount filters compare the signed amount, not its magnitude.** "Amount from 100.000"
+   excludes a −250.000 refund. The simpler reading, and the one that matches how the field
+   is labelled.
+4. **The amortisation median is taken over the magnitude of the amount** (`abs`), so a large
+   refund does not drag the threshold down, and over non-draft expenses only.
+5. **Category ranking is recent use first, then lifetime use, then the seeded sort order.**
+   "Most used" with no window would let a category used forty times three years ago sit
+   ahead of one used four times last month. The window is ninety days, the same one the
+   amortisation median uses.
+6. **Overriding the bucket away from the category's own bucket hands the budget default back
+   to the per-bucket policy.** `resolveCountsTowardBudget` prefers the category default over
+   the policy, which is right while the expense is in the category's own bucket and wrong
+   once it is not — a grocery moved to `car_project` should default to kept out. The switch
+   still wins over both. This is a form-level decision; `lib/budget.ts` is untouched.
+7. **Editing an expense re-derives what was never overridden.** An edit records an override
+   only where the stored value actually differs from what the category would have produced,
+   so changing the category on an untouched expense still moves its bucket, while an expense
+   that was deliberately moved stays where it was put.
+8. **The optimistic day subtotal is adjusted on the client.** Subtotals are computed in SQL,
+   per the phase brief; the only client arithmetic is the delta from writes still in flight,
+   which is unavoidable if a write is to be visible before the server answers. It is a pure
+   function in `lib/expenses/optimistic.ts` and is unit-tested against the SQL rule.
+9. **Loading more pages resets when the server sends a fresh page.** After a write
+   revalidates the route, pages loaded beyond the first are dropped and the ledger is back at
+   page one. The alternative is keeping rows the server has since changed. Scroll position is
+   the browser's.
+10. **A pending row dated older than the last loaded page appears at the bottom of the list**
+    rather than on the page it belongs to. It corrects itself the moment the server answers.
+11. **The undo toast appears after the delete succeeds**, not before. Showing it immediately
+    would be a few hundred milliseconds snappier and would let Undo race the delete it is
+    undoing.
+12. **A write against another user's row returns success.** RLS makes it affect zero rows;
+    PostgREST reports that as a successful update of nothing. The row is untouched and
+    nothing is disclosed, so the action does not go looking for a row it is not allowed to
+    see just to produce a better error.
+13. **The colour picker offers the seven design-system colours plus a native colour input.**
+    Category colour is user data and lands in `colour_hex` as a literal, so it cannot be a
+    token; the palette is the tokens' hexes so the default categories keep reading as buckets.
+14. **The icon catalogue is ninety curated glyphs, not the whole Phosphor barrel.** The full
+    barrel is roughly fifteen hundred icons. Adding one is one line in
+    `components/icons/catalog-names.ts` and one in the map.
+15. **The odometer field appears only once a vehicle is attached**, because a reading with no
+    car to attach it to is rejected by the schema.
+16. **Buckets, categories and vehicles filter as OR-within, AND-across** — any of the chosen
+    categories, and any of the chosen buckets, and so on.
+
+### Not built, and why
+
+- **Photo attachment is a stub.** The More disclosure has a Photos row with a disabled
+  control and the line "Photo upload arrives with the timeline in Phase 4." The roadmap gives
+  the compression and upload pipeline to Phase 4 and the phase brief allows the stub. The
+  **has-photo filter is real** and runs against the `attachments` table, so it will start
+  finding things the moment Phase 4 writes rows — it was tested by inserting an attachment
+  by hand.
+- **The odometer does not update the vehicle.** `vehicles.odometer_km` is a denormalised
+  maximum maintained by a trigger that Phase 3 owns, along with the "that reading is lower
+  than the last one" flag. An expense stores its own `odometer_km` today and the trigger will
+  pick it up.
+- **The Monthly / All-in / Car-only switcher.** Roadmap Phase 3. `/today` shows the monthly
+  figure and labels it "Monthly", because a total without its view named is ambiguous
+  (docs/01-PRODUCT.md).
+- **The odometer roll, the budget arc, stamps, torn-edge receipt cards and skeletons.** All
+  four signature elements and the loading treatment are roadmap Phase 8. The recessed
+  `panel-sunken` bed the hero figure sits on is here; the digits do not roll yet.
+- **Recurring expenses and the draft confirmation tray.** Phase 7. `ledger_page` already
+  takes `p_include_drafts` and defaults it to false, so drafts are invisible until that tray
+  exists.
+- **Category reordering by hand.** `sort_order` is stored, respected and editable through the
+  database, but there is no drag handle. Not in the phase brief.
+
+### Where confidence is low
+
+- **The performance budget still does not pass, for the same reason as Phase 0.** Measured on
+  the production build by summing the gzipped `<script src>` set of each route, excluding the
+  38.7KB `nomodule` polyfill bundle that modern browsers never fetch:
+
+  | Route | First-load JS, gzipped |
+  |---|---|
+  | `/settings` | 131.0KB |
+  | `/settings/categories` | 131.0KB |
+  | `/today` | 135.2KB |
+  | `/ledger` | 136.2KB |
+
+  The ceiling in CLAUDE.md is 120KB. Essentially all of it is the React 19 + Next 16 App
+  Router baseline — the same 131KB is on `/settings`, which contains almost nothing. Phase 2
+  adds about 5KB on top: react-hook-form, date-fns and every component in this phase. Before
+  the two bundle decisions above it was **232KB** on `/today`. As in Phase 0, this needs a
+  decision rather than a code change: either the budget is re-expressed as route JS *on top
+  of* the shared baseline, or the number moves. The docs were not edited.
+- **`next dev` was appending a block to CLAUDE.md on every start.** Next 16 writes an
+  agent-rules section into `CLAUDE.md` unless told not to; it did so once during this run and
+  was reverted. `agentRules: false` is now set in `next.config.ts`. Worth knowing about,
+  because it will happen to any checkout that predates that line.
+- **Three indexes and one extension were added that are not in `docs/02-DATA-MODEL.md`:**
+  `pg_trgm` plus GIN trigram indexes on `expenses.note` and `expenses.merchant`, which is
+  what makes a contains-match search something other than a sequential scan. No table,
+  column, enum or constraint changed, so the data contract in that document is intact and it
+  was not edited — but if indexes belong in it, these are the ones to add.
+- **`NOT MATERIALIZED` in `ledger_page`.** The filter CTE is referenced twice — once for the
+  page, once for the day subtotals — and is marked `not materialized` so the planner inlines
+  it and the filters reach the index rather than building the whole filtered set first. This
+  is right for a personal ledger and was not benchmarked against a hundred thousand rows.
+- **The virtual list assumes exact heights.** Ledger rows are 72px and day headings 36px, set
+  by the same constants the list measures with, and row text truncates rather than wraps. A
+  future row that wraps will misalign the spacers rather than fail loudly.
+- **React Compiler skips memoising `ExpenseForm`.** `npm run lint` reports one warning:
+  react-hook-form's `watch()` returns a function the compiler cannot memoise safely. The form
+  works; it simply is not auto-memoised. Lint exits 0.
+- **Nothing was driven through a real browser.** Every server render, every filter, every
+  Server Action and the RLS boundary were exercised over HTTP against the production build,
+  but the optimistic path, the sheet animation, the focus behaviour on a phone keyboard and
+  the scroll-driven virtualisation were not: they need a browser and there was none.
+
+### What a reviewer should check first
+
+1. **Log an expense on a phone and time it.** Tap the FAB, type `150k`, tap a category, tap
+   Log expense. The month figure on `/today` should move before the row appears. That is the
+   phase's acceptance criterion and the one thing only a human can judge.
+2. **The bundle question above.** It is the only acceptance criterion this phase does not
+   meet, and it is inherited.
+3. **Assumption 1 — zod off the client.** It is a real departure from CLAUDE.md section 2.
+   If the trade is unacceptable, `zod/mini` is the way to have both.
+4. **Delete something and press Undo**, then check the row came back in the same place in the
+   ledger rather than at the top.
+5. **A day split across a page boundary.** Log forty-one expenses on one day, scroll, press
+   Load older, and confirm the day subtotal reads the same above and below the join.
+6. **Rename a system category and archive a custom one**, then check the quick-add chips and
+   the ledger rows follow.

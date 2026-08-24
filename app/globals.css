@@ -158,4 +158,81 @@
     background-color: var(--surface-sunken);
     box-shadow: inset 0 1px 0 var(--rule);
   }
+  /* ---------------------------------------------------------------------
+     The bottom sheet. A native <dialog>, so the focus trap, the escape key
+     and the inert background come from the platform; only position and
+     motion are ours. Bottom on mobile, fade and scale on desktop.
+     --------------------------------------------------------------------- */
+  .sheet {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: 100%;
+    max-width: var(--content-max);
+    max-height: 92dvh;
+    margin: 0 auto;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-bottom: 0;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    background-color: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-sheet);
+    overflow: hidden;
+  }
+
+  .sheet::backdrop {
+    background-color: rgba(42, 38, 32, 0.32);
+  }
+
+  .sheet[open] {
+    animation: sheet-rise var(--duration-sheet) var(--ease-enter);
+  }
+
+  @keyframes sheet-rise {
+    from {
+      transform: translateY(12px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .sheet {
+      inset: 0;
+      margin: auto;
+      max-height: 84dvh;
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+    }
+
+    .sheet[open] {
+      animation: sheet-appear var(--duration-enter) var(--ease-enter);
+    }
+
+    @keyframes sheet-appear {
+      from {
+        transform: scale(0.98);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+  }
+
+  /* Reduced motion is opacity only: no rise, no scale. */
+  @media (prefers-reduced-motion: reduce) {
+    .sheet[open] {
+      animation: none;
+    }
+  }
+
+  /* Chrome and Safari still draw a marker on <summary> without this. */
+  summary::-webkit-details-marker {
+    display: none;
+  }
 }

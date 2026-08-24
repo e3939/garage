@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:db": "GARAGE_DB_TESTS=1 vitest run lib/supabase/local-stack.test.ts",
+    "test:db": "GARAGE_DB_TESTS=1 vitest run lib/supabase/local-stack.test.ts lib/queries/ledger.db.test.ts",
     "db:reset": "supabase db reset",
     "db:new": "supabase migration new",
     "db:types": "supabase gen types typescript --local > lib/supabase/types.ts",
@@ -43,6 +43,7 @@
     "next": "^16.3.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-hook-form": "^7.86.0",
     "server-only": "^0.0.1",
     "zod": "^4.4.3"
   }

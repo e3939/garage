@@ -186,6 +186,13 @@ export type Database = {
             referencedRelation: "categories"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "budgets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_categories_ranked"
+            referencedColumns: ["id"]
+          },
         ]
       }
       categories: {
@@ -303,6 +310,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_categories_ranked"
             referencedColumns: ["id"]
           },
           {
@@ -863,6 +877,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "recurring_expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_categories_ranked"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "recurring_expenses_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
@@ -1125,6 +1146,60 @@ export type Database = {
       }
     }
     Views: {
+      v_amortise_suggestion: {
+        Row: {
+          median_amount: number | null
+          multiplier: number | null
+          threshold: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      v_categories_ranked: {
+        Row: {
+          archived_at: string | null
+          colour_hex: string | null
+          created_at: string | null
+          default_bucket: Database["public"]["Enums"]["expense_bucket"] | null
+          default_counts_toward_budget: boolean | null
+          icon: string | null
+          id: string | null
+          is_system: boolean | null
+          last_used_on: string | null
+          name: string | null
+          sort_order: number | null
+          updated_at: string | null
+          user_id: string | null
+          uses_all: number | null
+          uses_recent: number | null
+        }
+        Relationships: []
+      }
+      v_category_usage: {
+        Row: {
+          category_id: string | null
+          last_used_on: string | null
+          user_id: string | null
+          uses_all: number | null
+          uses_recent: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_categories_ranked"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_expense_impact: {
         Row: {
           amount: number | null
@@ -1145,6 +1220,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_categories_ranked"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "expenses_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
@@ -1153,9 +1235,59 @@ export type Database = {
           },
         ]
       }
+      v_monthly_impact: {
+        Row: {
+          currency: string | null
+          expense_count: number | null
+          impact_month: string | null
+          total: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      ledger_page: {
+        Args: {
+          p_amount_max?: number
+          p_amount_min?: number
+          p_buckets?: Database["public"]["Enums"]["expense_bucket"][]
+          p_category_ids?: string[]
+          p_cursor_created_at?: string
+          p_cursor_id?: string
+          p_cursor_occurred_on?: string
+          p_from?: string
+          p_has_photo?: boolean
+          p_include_drafts?: boolean
+          p_limit?: number
+          p_search?: string
+          p_to?: string
+          p_vehicle_ids?: string[]
+        }
+        Returns: {
+          amortize_months: number
+          amount: number
+          attachment_count: number
+          bucket: Database["public"]["Enums"]["expense_bucket"]
+          category_colour_hex: string
+          category_icon: string
+          category_id: string
+          category_name: string
+          counts_toward_budget: boolean
+          created_at: string
+          currency: string
+          day_count: number
+          day_total: number
+          id: string
+          is_draft: boolean
+          merchant: string
+          note: string
+          occurred_on: string
+          odometer_km: number
+          vehicle_id: string
+          vehicle_nickname: string
+        }[]
+      }
     }
     Enums: {
       attachment_kind: "receipt" | "inspiration" | "progress" | "document"

@@ -1,6 +1,36 @@
-import { QuickAddFab } from '@/components/shell/quick-add-fab'
+import { QuickAdd } from '@/components/expenses/quick-add'
+import { categoryIconMap } from '@/components/expenses/category-icons'
+import { todayIso } from '@/lib/dates'
+import { fetchRankedCategories } from '@/lib/queries/categories'
+import { fetchAmortiseThreshold } from '@/lib/queries/expenses'
+import { fetchProfilePreferences } from '@/lib/queries/profile'
+import { fetchVehicleOptions } from '@/lib/queries/vehicles'
 
-/** The FAB is persistent, so the default is to show it. */
-export default function DefaultFab() {
-  return <QuickAddFab />
+/**
+ * The FAB is persistent, so the default slot is the one that carries it.
+ *
+ * Everything the quick-add sheet needs is fetched here, in parallel, on the
+ * server: the category ranking, the garage, the profile's currency, and the
+ * amortisation threshold. The sheet itself receives finished data and finished
+ * icons, so opening it costs no network at all.
+ */
+export default async function DefaultFab() {
+  const [categories, vehicles, preferences, amortiseThreshold] = await Promise.all([
+    fetchRankedCategories(),
+    fetchVehicleOptions(),
+    fetchProfilePreferences(),
+    fetchAmortiseThreshold(),
+  ])
+
+  return (
+    <QuickAdd
+      categories={categories}
+      icons={categoryIconMap(categories)}
+      vehicles={vehicles}
+      currency={preferences.baseCurrency}
+      locale={preferences.locale}
+      amortiseThreshold={amortiseThreshold}
+      today={todayIso()}
+    />
+  )
 }
