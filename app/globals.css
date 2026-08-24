@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Design tokens — docs/03-DESIGN.md
+   Every value here is mapped into tailwind.config.ts. Components use the
+   utility name (bg-surface, text-ink), never a raw hex.
+   --------------------------------------------------------------------------- */
+
+@layer base {
+  :root {
+    /* --- Source palette (Firenze). These five are the source; the rest derive. */
+    --fire-green: #578769;
+    --fire-cream: #fdf0ae;
+    --fire-amber: #f4b354;
+    --fire-brick: #a95031;
+    --fire-ember: #833012;
+
+    /* --- Derived neutrals: the ivory the app sits on. */
+    --paper: #fbf7ec;
+    --paper-raise: #fffdf7;
+    --paper-sink: #f2ebd9;
+    --rule: #e3dac3;
+    --rule-strong: #cfc2a4;
+    --ink: #2a2620;
+    --ink-soft: #6b6357;
+    --ink-faint: #9a9084;
+
+    /* --- Semantic mapping. Components reference these, never the raw ramp. */
+    --bg: var(--paper);
+    --surface: var(--paper-raise);
+    --surface-sunken: var(--paper-sink);
+    --border: var(--rule);
+    --border-strong: var(--rule-strong);
+    --text: var(--ink);
+    --text-muted: var(--ink-soft);
+    --text-faint: var(--ink-faint);
+    --accent: var(--fire-brick);
+    --accent-ink: #fffdf7;
+    --positive: var(--fire-green);
+    --attention: var(--fire-amber);
+    --critical: var(--fire-ember);
+    --highlight: var(--fire-cream);
+
+    /* --- Bucket colours. The app's core vocabulary; identical everywhere. */
+    --bucket-life: var(--ink-soft);
+    --bucket-car-running: var(--fire-green);
+    --bucket-car-project: var(--fire-brick);
+
+    /* --- Typography. Faces come from next/font in app/fonts.ts. */
+    --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+    --font-body: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
+    --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+    /* Scale. Two entries change between mobile and desktop; the media query
+       below moves the variable so one utility class covers both. */
+    --text-display-lg: 2rem; /* 32 */
+    --text-display: 1.5rem; /* 24 */
+    --text-title: 1.125rem; /* 18 */
+    --text-body: 0.9375rem; /* 15 */
+    --text-label: 0.8125rem; /* 13 */
+    --text-caption: 0.75rem; /* 12 */
+    --text-eyebrow: 0.6875rem; /* 11 */
+    --text-odometer-lg: 2.5rem; /* 40 */
+    --text-odometer: 1.25rem; /* 20 */
+
+    /* --- Shape. Nothing larger than --r-lg: the paper metaphor has folds. */
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 14px;
+    --r-full: 999px;
+
+    /* --- Spacing. 4 / 8 / 12 / 16 / 20 / 24 / 32 / 48. Nothing between. */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-12: 48px;
+
+    /* --- Structure. */
+    --content-max: 720px;
+    --nav-height: 64px;
+    --fab-size: 56px;
+    --touch-min: 44px;
+
+    /* --- Elevation is rules and tint. Exactly one shadow token exists. */
+    --shadow-sheet: 0 -8px 32px rgba(42, 38, 32, 0.12);
+
+    /* --- Motion. */
+    --duration-state: 120ms;
+    --duration-enter: 200ms;
+    --duration-sheet: 320ms;
+    --duration-arc: 600ms;
+    --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-exit: ease-out;
+  }
+
+  @media (min-width: 768px) {
+    :root {
+      --text-display-lg: 2.125rem; /* 34 */
+      --text-display: 1.625rem; /* 26 */
+    }
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Every number in the app is mono and tabular. */
+  code,
+  kbd,
+  samp,
+  pre,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Keyboard focus is visible everywhere. Quality floor, docs/03-DESIGN.md. */
+  :focus-visible {
+    outline: 2px solid var(--fire-green);
+    outline-offset: 2px;
+  }
+
+  /* Nothing loops, nothing bounces, and none of it runs when it is unwelcome. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* The recessed bed a hero figure sits on. See "the odometer strip". */
+  .panel-sunken {
+    background-color: var(--surface-sunken);
+    box-shadow: inset 0 1px 0 var(--rule);
+  }
+}
