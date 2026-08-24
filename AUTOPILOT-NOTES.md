@@ -158,3 +158,204 @@ cases are locked in as tests in `eslint-rules/no-emoji.test.mts`, so the proof s
    it.
 5. **The bundle budget question** above. It is the only acceptance criterion this phase does
    not meet.
+
+---
+
+## Phase 1 — Schema and money core
+
+Branch: `feat/01-schema-money` (the roadmap names this branch `feat/schema-money`; the branch
+already existed under the other name when the run started and was left alone, matching what
+Phase 0 did).
+
+### What was built
+
+- **Nine migrations, replaying clean from zero**, one per logical group: enums, core tables,
+  car tables, money tables, attachments, views, RLS, storage, and the trigger that gives a new
+  user their categories. Seventeen tables, every column, constraint, index and enum from
+  `docs/02-DATA-MODEL.md`, verified column-by-column against that document after the reset.
+- **RLS on all seventeen tables, four policies each, and a guard that enforces it.** The last
+  block of `0007_rls.sql` walks `pg_class` and raises if any public table has RLS off or fewer
+  than four policies, so a future migration that adds a table and forgets its policies fails
+  the reset instead of shipping an open table. Grants are explicit too, because this stack
+  does not auto-expose new tables to the Data API roles.
+- **`lib/money.ts`** — integer minor units throughout, exponents from an ISO 4217 lookup table
+  (zero-decimal, three-decimal and four-decimal currencies all listed; anything unlisted falls
+  back to two), VND formatting as `150.000` with the dong sign trailing, arithmetic helpers
+  that throw on a non-integer, and `parseAmount` for what someone actually types on a phone.
+- **`lib/budget.ts`** — `resolveBucket`, `resolveCountsTowardBudget` and `amortiseSlices`, the
+  last of which is a deliberate mirror of `v_expense_impact` down to the remainder rule and
+  the behaviour on negatives.
+- **144 tests.** 94 hermetic ones covering money and budget, and 50 integration ones against
+  the local stack that prove RLS holds and that `amortiseSlices` and the view agree row for
+  row. The integration file is skipped unless `GARAGE_DB_TESTS=1`, so `npm test` needs no
+  Docker; `npm run test:db` runs it.
+
+### Proof that RLS holds
+
+`npm run test:db`, against a database freshly reset from zero. Two users are created through
+the local auth admin API, the first inserts a row into every one of the seventeen tables plus
+an object in the `receipts` bucket, and the second is then examined. 50 assertions, all
+passing:
+
+| Check | Result |
+|---|---|
+| First user sees their own rows, all 17 tables (positive control) | passes for every table |
+| Second user sees any of the first user's rows, all 17 tables | **zero rows, every table** |
+| Second user reads `v_expense_impact` | **zero rows** |
+| Second user's own visible data | 15 categories, 1 profile, nothing else |
+| Second user inserts an expense with `user_id` = first user | rejected, HTTP 403 |
+| Second user updates the first user's expense | 0 rows changed, value intact |
+| Second user deletes the first user's expense | 0 rows deleted, row intact |
+| Second user downloads the first user's receipt | rejected |
+| Second user uploads into the first user's storage folder | rejected |
+
+The positive control matters as much as the negative one: without it, "the second user sees
+nothing" would also pass if the API were returning nothing to anybody. **No row belonging to
+the first user was visible to the second. This is not a phase failure.**
+
+Amortisation parity, read straight out of the view for a 100 VND expense over 3 months:
+
+```
+ impact_month | amount
+--------------+--------
+ 2026-08-01   |     34
+ 2026-09-01   |     33
+ 2026-10-01   |     33
+```
+
+`amortiseSlices` returns exactly that, and the same for 1 over 12, both refunds, a 24-month
+spread crossing a year end, and an odd amount over 7 months.
+
+### Assumptions
+
+1. **Only `v_expense_impact` was built.** The phase prompt lists "views" as a migration group,
+   but `docs/04-ROADMAP.md` assigns the other four to the phases that build the screens
+   reading them: `v_vehicle_totals` to Phase 3, `v_timeline` to Phase 4, `v_fuel_consumption`
+   and `v_service_due` to Phase 6. Phase 1's own roadmap entry names `v_expense_impact` alone.
+   Writing the others now would also have meant inventing semantics that are not in the data
+   model — see the `km_driven` note below — so they were left for their phases. `0006_views.sql`
+   says so in a comment.
+2. **`v_vehicle_totals` will need a column that does not exist yet.** The document defines
+   `km_driven` as "odometer minus odometer at purchase", but `vehicles` has no purchase
+   odometer — only `odometer_km` and `odometer_at`. Phase 3 will need either a new column or
+   a different definition, and this is a decision, not a coding detail. Nothing was invented.
+3. **Attachments got their own migration.** It is polymorphic across six other tables, so it
+   cannot be created before them; splitting it out was cleaner than adding six deferred
+   foreign keys. Same reasoning, smaller, applies to `expenses.mod_plan_id`, `fund_id` and
+   `recurring_id`: the columns are created with the table in `0002` and their foreign keys are
+   added in `0003` and `0004` once the targets exist.
+4. **Migrations are numbered `0001_`, not timestamped.** `CLAUDE.md` section 4 says
+   `NNNN_description.sql, sequential`. The Supabase CLI accepts it; a probe migration was run
+   first to confirm before anything real was written.
+5. **`profiles` has no `user_id`, so its policies key on `id`.** It is keyed by the auth user
+   id, exactly as the document defines it.
+6. **`mod_dependencies` has no `user_id` either**, because the document does not give it one.
+   Its policies read ownership through `mod_plans`, and insert and update require *both* ends
+   of the edge to belong to the caller, so a dependency can never be pointed at someone
+   else's mod.
+7. **Two triggers were added that the data model implies but does not spell out.**
+   `auth.users` inserts a `profiles` row, and that row seeds the fifteen system categories.
+   Without the first, the second could never fire, because nothing else in the app writes to
+   `profiles`.
+8. **Category colours come from the bucket vocabulary.** The seed table in
+   `docs/02-DATA-MODEL.md` has no colour column but `categories.colour_hex` is `not null`, so
+   the three bucket colours in `docs/03-DESIGN.md` were used: life is `#6B6357` (ink-soft),
+   running is `#578769` (fire-green), project is `#A95031` (fire-brick). All fifteen are
+   recolourable; `is_system` only prevents deletion.
+9. **`seed.sql` is a comment.** The document says system categories are seeded "on first
+   sign-in via a trigger on `profiles`", and `seed.sql` runs against an empty database with no
+   users in it, so the rows cannot live there. The file exists so a reset stays quiet and so
+   there is an obvious home for genuinely global seed data later.
+10. **No check constraints beyond the ones the document states.** `distance_unit`,
+    `volume_unit`, `default_view`, `fuel_type` and `transmission` carry their allowed values
+    as SQL comments, matching how the document writes them. zod will enforce them at the edge
+    in the phases that build the forms. The constraints the document *does* state are all
+    present: the amortisation range, the bucket-and-vehicle rule, one non-null service
+    interval, the single-owner rule on attachments, no self-dependency, and budgets landing on
+    the first of a month.
+11. **Two uniqueness rules use `nulls not distinct`.** `budgets (user_id, month, category_id)`
+    so the overall budget row is one per month rather than unlimited, and
+    `milestones (user_id, vehicle_id, kind) where auto` so a garage-wide milestone is awarded
+    once. Postgres 15 and up; the local stack is 17.
+12. **Amounts are `number` in TypeScript, not `bigint`.** They are `bigint` in Postgres, but
+    supabase-js hands them back as numbers, and `bigint` does not survive JSON or a form field
+    without ceremony. Every helper asserts `Number.isSafeInteger`, which caps a single amount
+    at about nine quadrillion minor units — nine million billion dong. If that stops being
+    enough the assertion will say so loudly rather than quietly losing precision.
+13. **`parseAmount` resolves the one genuinely ambiguous input by digit count, not by
+    currency alone.** A lone separator followed by exactly three digits is grouping, so
+    `150.000` is a hundred and fifty thousand in both VND and USD. Fewer digits than the
+    currency has decimal places is a fraction, so `150.00` is $150 but is unreadable in VND
+    and returns null. More than three digits can only be a fraction, because no thousands
+    group is four digits long. A shorthand suffix overrides all of it: `1.2m` is always 1.2
+    million. `0.005` is rejected as grouping — a leading group of zero gives it away — and
+    read as a fraction instead.
+14. **`k`, `m` and `b` are the shorthand suffixes.** The Vietnamese `tr` (triệu) and `tỷ` were
+    not added; they are not in the spec and guessing at input conventions unattended felt like
+    the wrong call. Easy to add to `MULTIPLIER_POWERS` if you want them.
+15. **`formatMoney` normalises the non-breaking space** that `Intl` puts between the number and
+    the currency sign, so the output is literally `150.000 ₫` and a test or a snapshot can
+    compare it without knowing about U+00A0. Preventing a line break there is CSS's job.
+16. **`resolveBucket` keeps the bucket consistent with the vehicle**, because the check
+    constraint will not accept anything else. Attaching a vehicle to a life expense makes it
+    `car_running`; removing the vehicle from a project expense makes it `life`. The form is
+    expected to show the chip changing rather than doing this silently.
+17. **The default budget policy is a constant.** `docs/01-PRODUCT.md` says it is editable in
+    Settings, but `profiles` has no column for it, so `resolveCountsTowardBudget` takes an
+    optional `policy` argument that Settings can pass once there is somewhere to store one.
+
+### Not built, and why
+
+- **The four other views**, per assumption 1.
+- **The odometer trigger on `vehicles`.** The data model describes it; `docs/04-ROADMAP.md`
+  puts it in Phase 3 alongside odometer entry, and there is nothing to maintain the column
+  from until then. The column exists with its default.
+- **The trigger that rolls a `service_records` insert up into its schedule's `last_done_*`.**
+  Same reasoning: the data model describes it, the roadmap puts maintenance in Phase 6.
+- **Fuel-economy tests.** `CLAUDE.md` section 7 asks for them; the calculation lives in
+  `v_fuel_consumption`, which is Phase 6. They belong with it.
+- **Anything touching the cloud.** No `supabase db push`, no link, no deploy. Local only,
+  as instructed.
+- **`.env.example` is untouched** — this phase introduced no application environment
+  variables. `GARAGE_DB_TESTS` is a test flag, not app config, and is set by
+  `npm run test:db`. The Phase 0 note about `.env.example` still stands and is still the one
+  thing a human needs to check by hand.
+
+### Where confidence is low
+
+- **`parseAmount`'s ambiguity rule is a judgement call**, specifically that `150.000` in a
+  two-decimal currency reads as a hundred and fifty thousand rather than as `150.000` rounded
+  to `150.00`. It is consistent and it is tested, but it is the kind of rule worth disagreeing
+  with. It is one branch in one function if you want it changed.
+- **The seeded category colours** are three colours across fifteen categories. That is the
+  bucket vocabulary applied literally, and the ledger will read as buckets, but a designer may
+  want fifteen distinguishable swatches instead. The seed table in the document has no colour
+  column, so this was not a choice the document made.
+- **`grant select, insert, update, delete on all tables in schema public`** covers everything
+  that exists at the moment `0007` runs. Tables added by later migrations will need their own
+  grants. The RLS guard at the end of `0007` catches a missing policy but not a missing grant;
+  a missing grant fails loudly at the first query, so it is a noisy failure rather than a
+  silent one.
+- **`v_expense_impact` reads `amortize_months` on every row of `expenses`** with no index
+  helping the lateral expansion. It is correct and it is fast on a single user's data; whether
+  it stays fast at ten thousand expenses is a Phase 7 question, and the answer if not is a
+  materialised monthly rollup, not a change to the rule.
+- **Storage policies were proved through the storage API**, upload and download, both
+  directions, which is the path the app will use. They were not exercised through the S3
+  protocol endpoint.
+
+### What a reviewer should check first
+
+1. **Run `npm run test:db` yourself**, ideally after `npx supabase db reset`. It is the
+   acceptance criterion for this phase and it takes four seconds. Everything else here is
+   secondary to those 50 assertions.
+2. **Read `supabase/migrations/0007_rls.sql`**, in particular the guard block at the end and
+   the `mod_dependencies` policies. Those two are where a mistake would be quiet.
+3. **Decide the `v_vehicle_totals` / `km_driven` question** (assumption 2) before Phase 3
+   starts, since it may mean a new column on `vehicles` and therefore an edit to
+   `docs/02-DATA-MODEL.md`.
+4. **Sanity-check the fifteen seeded categories** — names, icons, buckets and especially which
+   ones count toward the budget — by signing in as a fresh user and opening the category list.
+   `Mods & Parts`, `Track & Events` and `Tools & Garage` should be the three that do not.
+5. **Argue with `parseAmount`** if you want to. Type a few amounts the way you actually would
+   and check `lib/money.test.ts` covers them.

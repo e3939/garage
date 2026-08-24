@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:db": "GARAGE_DB_TESTS=1 vitest run lib/supabase/local-stack.test.ts",
     "db:reset": "supabase db reset",
     "db:new": "supabase migration new",
     "db:types": "supabase gen types typescript --local > lib/supabase/types.ts",

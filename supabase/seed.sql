@@ -1,0 +1,11 @@
+-- supabase/seed.sql
+--
+-- Runs on `supabase db reset`, against an empty database with no users in it.
+--
+-- The system categories are per-user rows, so they cannot live here: they are
+-- inserted by the trigger on `profiles` in migration 0009 the first time somebody
+-- signs in. Default service intervals are seeded per vehicle at vehicle creation
+-- and arrive with the maintenance screens.
+--
+-- Nothing to seed globally yet. This file exists so a reset stays quiet and so
+-- there is an obvious place for genuinely global seed data if any ever appears.
