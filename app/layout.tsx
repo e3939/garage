@@ -18,6 +18,15 @@ export const metadata: Metadata = {
   },
   formatDetection: {
     telephone: false,
+    date: false,
+    address: false,
+    email: false,
+  },
+  other: {
+    // Next 16 emits `mobile-web-app-capable` and has dropped the legacy
+    // Apple spelling. iOS 16.4 and up read the manifest instead, but older
+    // iOS still wants this one to open standalone rather than in Safari.
+    'apple-mobile-web-app-capable': 'yes',
   },
 }
 

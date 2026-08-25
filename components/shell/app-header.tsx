@@ -18,8 +18,11 @@ type AppHeaderProps = {
  */
 export function AppHeader({ title, eyebrow, actions, back }: AppHeaderProps) {
   return (
-    <header className="sticky top-0 z-10 border-b border-border bg-bg/95 backdrop-blur">
-      <div className="mx-auto flex max-w-content items-center justify-between gap-4 px-4 py-3">
+    <header
+      className="sticky top-0 z-10 border-b border-border bg-bg/95 backdrop-blur"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
+      <div className="safe-x mx-auto flex max-w-content items-center justify-between gap-4 py-3">
         <div className="min-w-0">
           {back ? (
             <Link href={back.href} className="text-eyebrow font-display uppercase text-accent">

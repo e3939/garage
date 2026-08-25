@@ -18,7 +18,7 @@ export function BottomNav() {
       aria-label="Sections"
       className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]"
     >
-      <ul className="mx-auto flex h-nav max-w-content items-stretch">
+      <ul className="safe-x mx-auto flex h-nav max-w-content items-stretch">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = isActive(pathname, href)
           return (

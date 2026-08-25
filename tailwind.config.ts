@@ -64,6 +64,7 @@ const config: Config = {
       8: 'var(--space-8)',
       12: 'var(--space-12)',
       // Structural sizes, not spacing steps.
+      gutter: 'var(--gutter)',
       touch: 'var(--touch-min)',
       nav: 'var(--nav-height)',
       fab: 'var(--fab-size)',
@@ -95,6 +96,8 @@ const config: Config = {
       ],
       title: ['var(--text-title)', { lineHeight: '1.3', fontWeight: '600' }],
       body: ['var(--text-body)', { lineHeight: '1.5', fontWeight: '400' }],
+      // The 16px floor every form control sits on. See --text-input.
+      input: ['var(--text-input)', { lineHeight: '1.4', fontWeight: '400' }],
       label: ['var(--text-label)', { lineHeight: '1.35', fontWeight: '500' }],
       caption: ['var(--text-caption)', { lineHeight: '1.4', fontWeight: '400' }],
       eyebrow: [

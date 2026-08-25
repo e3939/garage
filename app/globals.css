@@ -64,6 +64,9 @@
     --text-eyebrow: 0.6875rem; /* 11 */
     --text-odometer-lg: 2.5rem; /* 40 */
     --text-odometer: 1.25rem; /* 20 */
+    /* iOS Safari zooms the whole page when a focused control is under 16px,
+       and it never zooms back out. This is the floor, not a style choice. */
+    --text-input: 1rem; /* 16 */
 
     /* --- Shape. Nothing larger than --r-lg: the paper metaphor has folds. */
     --r-sm: 6px;
@@ -82,6 +85,7 @@
     --space-12: 48px;
 
     /* --- Structure. */
+    --gutter: var(--space-4);
     --content-max: 720px;
     --nav-height: 64px;
     --fab-size: 56px;
@@ -111,7 +115,18 @@
   }
 
   html {
+    /* iOS inflates text on rotation without this. */
     -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Kills double-tap-to-zoom and the 300ms click delay. Pinch-zoom is
+       untouched on purpose: it is an accessibility feature, and
+       user-scalable=no has been ignored by iOS Safari since iOS 10 anyway. */
+    touch-action: manipulation;
+    /* The grey flash on tap is the loudest "this is a web page" tell. It goes,
+       and the :active rule below replaces the feedback it was carrying. */
+    -webkit-tap-highlight-color: transparent;
+    /* No rubber-band past the ends of the document. */
+    overscroll-behavior: none;
   }
 
   body {
@@ -122,6 +137,48 @@
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+  }
+
+  /* Every control clears the 16px floor. This sits in the base layer, so a
+     utility still wins where a larger size is wanted -- the quick-add amount
+     field is 40px and stays 40px -- but nothing can silently fall under it. */
+  input,
+  select,
+  textarea {
+    font-size: var(--text-input);
+  }
+
+  /* Chrome should not select like a document: dragging a nav label or a row
+     and getting a blue selection is the other loud web-page tell. Content
+     still selects, and every amount in the app is .font-mono, so amounts stay
+     copyable even though the row around them is a button. */
+  header,
+  nav,
+  button,
+  summary,
+  [role='button'] {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  input,
+  textarea,
+  .font-mono,
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+
+  /* Press feedback, now that the tap highlight is gone. Tint, not shadow:
+     elevation in this app is rules and tint (docs/03-DESIGN.md). */
+  a:active,
+  summary:active,
+  [role='button']:active,
+  button:not(:disabled):active {
+    opacity: 0.68;
   }
 
   /* Every number in the app is mono and tabular. */
@@ -153,6 +210,13 @@
 }
 
 @layer components {
+  /* The horizontal gutter, widened to clear the notch in landscape. One
+     class so the gutter is set in exactly one place. */
+  .safe-x {
+    padding-left: max(var(--gutter), env(safe-area-inset-left));
+    padding-right: max(var(--gutter), env(safe-area-inset-right));
+  }
+
   /* The recessed bed a hero figure sits on. See "the odometer strip". */
   .panel-sunken {
     background-color: var(--surface-sunken);
@@ -178,6 +242,9 @@
     color: var(--text);
     box-shadow: var(--shadow-sheet);
     overflow: hidden;
+    /* The sheet is flush to the bottom edge, so its last control would sit
+       under the home indicator without this. */
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .sheet::backdrop {

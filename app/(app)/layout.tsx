@@ -34,7 +34,7 @@ export default async function AppLayout({ children, header, fab }: AppLayoutProp
         <div className="min-h-dvh">
           {header}
           <main
-            className="mx-auto max-w-content px-4 py-6"
+            className="safe-x mx-auto max-w-content py-6"
             style={{
               paddingBottom:
                 'calc(var(--nav-height) + var(--space-12) + env(safe-area-inset-bottom))',

@@ -27,8 +27,13 @@ export function Field({ label, htmlFor, hint, error, children, className = '' }:
   )
 }
 
+/**
+ * `text-input` rather than `text-body` on purpose: 15px body text is right for
+ * reading and wrong for a control, because iOS Safari zooms the page when a
+ * focused control is under 16px and never zooms back out.
+ */
 export const INPUT_CLASS = [
   'w-full min-h-touch rounded-md border border-border-strong bg-surface px-3',
-  'text-body text-ink placeholder:text-ink-faint',
+  'text-input text-ink placeholder:text-ink-faint',
   'outline-none',
 ].join(' ')

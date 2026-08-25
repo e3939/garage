@@ -68,7 +68,7 @@ export function AmortiseField({
             const next = Number(event.target.value)
             onChange(Number.isFinite(next) ? Math.min(120, Math.max(1, Math.trunc(next))) : 1)
           }}
-          className="min-h-touch w-20 rounded-md border border-border-strong bg-surface px-3 text-center font-mono text-body text-ink outline-none"
+          className="min-h-touch w-20 rounded-md border border-border-strong bg-surface px-3 text-center font-mono text-input text-ink outline-none"
         />
         <span className="text-label text-ink-muted">months</span>
       </div>
