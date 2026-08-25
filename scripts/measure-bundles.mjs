@@ -162,7 +162,12 @@ async function main() {
   const local = stack()
   const { hashedToken, userId } = await signInToken(local)
   const vehicleId = await probeVehicle(local, userId)
-  ROUTES.splice(ROUTES.indexOf('/garage') + 1, 0, `/garage/${vehicleId}`)
+  ROUTES.splice(
+    ROUTES.indexOf('/garage') + 1,
+    0,
+    `/garage/${vehicleId}`,
+    `/garage/${vehicleId}/plan`,
+  )
 
   const server = spawn('npx', ['next', 'start', '-p', String(PORT)], {
     stdio: ['ignore', 'ignore', 'inherit'],
@@ -205,9 +210,11 @@ async function main() {
       const own = sources
         .filter((src) => !shared.includes(src))
         .reduce((total, src) => total + gzippedBytes(src), 0)
-      const label = route.startsWith('/garage/') && route !== '/garage/new'
-        ? '/garage/[vehicleId]'
-        : route
+      const label = route.endsWith('/plan')
+        ? '/garage/[vehicleId]/plan'
+        : route.startsWith('/garage/') && route !== '/garage/new'
+          ? '/garage/[vehicleId]'
+          : route
       console.log(
         `${label.padEnd(24)}${kb(own).padStart(7)}${kb(own + baseline).padStart(11)}`,
       )

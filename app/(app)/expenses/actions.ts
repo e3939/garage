@@ -21,11 +21,18 @@ import type { TablesInsert } from '@/lib/supabase/types'
 
 export type ActionResult = { ok: true } | { ok: false; error: string }
 
-/** The screens an expense write can change. */
+/**
+ * The screens an expense write can change.
+ *
+ * `/garage` is in the list because a car expense moves that vehicle's lifetime
+ * totals, and an expense carrying a `mod_plan_id` moves the actual on a card and
+ * the planning-accuracy figure that reads it.
+ */
 function revalidateExpenseScreens(): void {
   revalidatePath('/today')
   revalidatePath('/ledger')
   revalidatePath('/money')
+  revalidatePath('/garage', 'layout')
 }
 
 async function currentUserId(): Promise<string | null> {
@@ -60,6 +67,9 @@ function toRow(input: ExpenseWrite, userId: string) {
     merchant: input.merchant,
     note: input.note,
     odometer_km: input.odometer_km,
+    // Absent means "do not touch": an edit from the ledger does not carry the
+    // mod link and must not clear it. See `linkedUuid` in the schema.
+    ...(input.mod_plan_id === undefined ? {} : { mod_plan_id: input.mod_plan_id }),
   }
 }
 

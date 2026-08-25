@@ -1396,3 +1396,323 @@ the regression rather than paper over it.
    is a price you will pay or a thing to send back.
 6. **`supabase db push` for `0014_timeline.sql`**, after a backup as usual. It is additive and
    touches no data.
+
+---
+
+## Phase 6 — Mod planner
+
+Branch: `feat/06-mod-planner` (the roadmap names this branch `feat/mod-planner` and calls it
+Phase 5; as in every phase before it the branch already existed under the other name when the
+run started and was left alone. The heading here follows the branch number so the sections in
+this file stay in order — it is roadmap Phase 5, "Mod planner").
+
+### What was built
+
+- **A board you can actually drag on a phone.** Five columns — Dreaming, Researching, Saving,
+  Ordered, Installed — as a horizontally snapping carousel rather than a squeezed five-up
+  grid, each column header carrying its count and the estimate subtotal for what is in it.
+  Dragging is written by hand on pointer events with a 44px handle per card: the handle
+  carries `touch-action: none` so a drag is never mistaken for a scroll, the card stays in
+  place at reduced opacity while a copy follows the finger, and where it will land is an ink
+  rule between two cards. The track scrolls itself when the finger nears either edge. Arrow
+  keys on the handle do the same job without a pointer. Every drop is optimistic and lands as
+  one `mod_reorder` statement; a failure puts the board back and says why.
+- **The mod detail sheet.** Title, description, priority as the four named levels, the
+  estimate as a min–max range with the shorthand parser and a live parsed hint under each
+  field, target date, a links list with an Open affordance, notes, inspiration photos through
+  the same `<AttachmentField>` the expense form uses, and dependencies as a multi-select of
+  the other mods on the car. Cycles are refused server-side with the loop named in words:
+  *"That would make a loop: Coilovers needs Wheels, and Wheels needs Coilovers."* A mod whose
+  dependencies are not installed shows a `LinkBreak` and "Blocked by: <names>" on its card.
+- **The build sheet.** The whole plan's estimated cost on the odometer strip at the top of the
+  board, broken down by column underneath, with a caption that says how much of it is already
+  spent and how many mods carry no estimate at all — because the total of the ones that do is
+  not the total of the plan, and a figure that implies otherwise is worse than no figure.
+- **Plan against actual.** Marking a mod installed moves it to the Installed column and opens
+  the expense form pre-filled with the estimate midpoint, the vehicle, bucket `car_project`,
+  the "Mods & Parts" category, today's date and `mod_plan_id` set. After saving, the card
+  shows the actual — the sum of *every* expense pointing at the mod — with a signed variance
+  against the estimate. Dropping a card into Installed does the same thing as the button.
+- **Planning accuracy and before/after on the vehicle page.** `sum(actual) / sum(estimate)`
+  across installed mods as a percentage with a one-line reading ("You spend 14% more than you
+  plan."), and a drag slider holding one inspiration photograph against the car's hero photo:
+  two images, one handle, no animation beyond the drag.
+
+### Proof it works
+
+`npm test` — **218 hermetic tests**, 40 of them new across `lib/mods/graph.test.ts` (the cycle
+finder and the sentence it produces) and `lib/mods/board.test.ts` (column grouping, drop
+index, the move that renumbers two columns, the `installed_on` stamp, keyboard nudges).
+`npm run test:db` — **120 against a database reset from zero**, 24 of them new in
+`lib/queries/mods.db.test.ts`. `npm run typecheck`, `npm run lint` (0 errors, 4 pre-existing
+react-hook-form compiler warnings) and `npm run build` all clean. `npx supabase db reset`
+replays all fifteen migrations from nothing.
+
+Beyond the suites, the production build was driven over HTTP with a real magic-link session
+and the Server Actions called directly by their action ids. **50 checks, all passing:**
+
+| Check | Result |
+|---|---|
+| `/garage/[id]/plan` signed in | 200, five columns, build sheet, cards |
+| `createModAction` with a range, a target date and a link | written |
+| `createModAction` with a dependency | edge written |
+| `updateModAction` closing a two-mod loop | refused, **and the sentence names both mods** |
+| The refused edge | **not written** — the dependency sync runs before the update |
+| Build-sheet total with one estimate-less mod | `52.000.000` = 22m + 30m, caption says one of three has no estimate |
+| Blocked card | `Blocked by: Coilovers` |
+| `moveModsAction` into Installed | status moved, `installed_on` = the date passed in |
+| `moveModsAction` back out | `installed_on` cleared |
+| `moveModsAction` with a bad date | rejected by the schema |
+| The pre-filled expense | saved with `mod_plan_id`, `car_project`, out of the budget |
+| Two expenses on one mod | card reads `25.000.000` and `+3.000.000 ₫ against plan` |
+| Editing that expense from the ledger | **the mod link survives**, and the edit lands |
+| Planning accuracy on the vehicle page | `114%`, "You spend 14% more than you plan." |
+| Re-saving a mod that has a photo | the attachment row survives |
+| Removing the photo in the sheet | the row and the storage object both go |
+| Before/after section with a hero and an inspiration photo | rendered |
+| Archive a mod, then undo | off the board, then back |
+| Blank title / inverted range / `javascript:` link / foreign dependency | all four refused with sentences |
+| A second user opening the plan | 404, and `moveModsAction` on that board changes nothing |
+| Emoji anywhere in the rendered pages | none |
+
+The database checks are where the arithmetic is pinned down: the estimate is the midpoint
+(20m–24m gives 22m), whichever end exists when only one does, and null when neither does; the
+actual excludes drafts; the build sheet adds up per column and once more for the whole board
+through one `grouping sets` query; `v_vehicle_totals.planning_accuracy` comes out at exactly
+1.1 for 5.5m spent against a 5m estimate; and a stranger sees nothing through `mod_board`,
+`v_mod_costs` or `v_mod_board_totals` and can reorder nothing.
+
+### Route size
+
+`npm run build && npm run measure:bundles`. "Before" is the table recorded in the Phase 5
+section of this file, measured by the same script against the same stack; `/garage/new`,
+`/settings` and `/settings/categories` come out byte-identical, which is what says the two
+runs are comparable.
+
+| Route | Own JS before | Own JS after |
+|---|---|---|
+| `/today` | 32.3KB | 32.9KB |
+| `/ledger` | 32.7KB | 33.4KB |
+| `/garage` | 38.5KB | 38.7KB |
+| `/garage/[vehicleId]` | 45.4KB | **45.7KB** |
+| `/garage/[vehicleId]/plan` | — | **26.2KB** |
+| `/garage/new` | 16.1KB | 16.1KB |
+| `/money` | 28.3KB | 28.6KB |
+| `/settings` | 0.0KB | 0.0KB |
+| `/settings/categories` | 12.1KB | 12.1KB |
+
+Shared baseline 139.7KB across eight chunks, unchanged — nothing landed in the shell.
+
+The new route is **26.2KB, comfortably inside the 40KB ceiling**, and it holds a board, three
+sheets, a form with a list editor and a hand-written drag. That is because the two heaviest
+things it could have carried are not in its initial script set: the expense form arrives on
+the tap that marks a mod installed, and the photo field on the tap that opens the sheet. The
+half-kilobyte the other routes gained is the expense form's new `prefill` branch plus the
+shared `<Fab>`; `/garage/[vehicleId]` gained 0.3KB for the whole before/after feature, because
+the slider is a separate chunk fetched after the page is interactive.
+
+### Assumptions
+
+1. **`abandoned` is not a column.** The enum has six values and the board has five. A mod you
+   have stopped wanting is not a sixth stage of wanting it, so the way out of the plan is
+   **Remove**, which archives the mod — expenses may point at it and those are real money —
+   with an Undo toast. Nothing in the UI can set `abandoned`; a row that somehow held it would
+   simply not appear on the board. If you want it back as a column, add it to `BOARD_STATUSES`
+   in `lib/mods/types.ts` and it appears everywhere at once.
+2. **The estimate is the midpoint, computed in SQL.** `v_mod_costs` uses
+   `coalesce((min + max) / 2, max, min)`, which is character-for-character the rule
+   `v_vehicle_totals.planning_accuracy` already used since Phase 3. The two agree by
+   construction rather than by two pieces of code happening to round the same way, and integer
+   division truncates in both. A mod with no estimate at all is null, not zero, in both.
+3. **The board is not paged.** A plan is a list of wants, not a log: ten is a lot and fifty
+   would be a different problem than pagination solves. `mod_board` returns the whole board
+   with every card's dependencies and photographs attached, so the page is two round trips —
+   one for the board, one to sign the photographs.
+4. **The drag is hand-written, and it is handle-based.** No drag-and-drop dependency was added;
+   the whole thing is about a hundred and twenty lines of pointer events plus the pure geometry
+   in `lib/mods/board.ts`. The handle is a separate control from the card body because a phone
+   cannot tell a slow tap from the start of a drag reliably enough to guess, and because the
+   card body has to stay tappable — it opens the sheet — and the column has to stay scrollable.
+5. **The dragged card does not leave the layout.** It stays where it was at 40% opacity while a
+   fixed-position copy follows the finger, and the drop target is drawn as an absolutely
+   positioned rule that costs the column no layout. This is the reason the target cannot
+   oscillate between two positions while the finger holds still, which is the classic failure
+   of the "lift the card out and insert a placeholder" approach: the placeholder moves the
+   cards the target is measured against.
+6. **The drag handle is a hand-drawn SVG, not a Phosphor glyph.** The canonical mapping table in
+   `docs/03-DESIGN.md` has no row for "drag", and adding one is a change to that document,
+   which this phase was not pre-approved to make. CLAUDE.md section 1 allows an inline SVG in
+   `components/icons/` for exactly this case, so `components/icons/grip.tsx` is six dots in two
+   columns at 20px. **If you want the table to stay the single index of every icon in the app,
+   the row to add is `| Drag handle | DotsSixVertical |`** and the component becomes a
+   re-export. Same shape as the `NoteBlank` note in Phase 3.
+7. **Dropping a card into Installed opens the pre-filled expense sheet.** The button in the
+   sheet and the gesture on the board are the same act, so they do the same thing. Closing that
+   sheet leaves the card where it landed; the status move is already saved.
+8. **The pre-fill is exactly the six things the brief names** — estimate midpoint, vehicle,
+   bucket `car_project`, category "Mods & Parts", today's date, `mod_plan_id`. The merchant is
+   deliberately *not* pre-filled with the mod's title: a merchant is where you bought it, not
+   what you bought, and a ledger full of rows merchanted "Coilovers" would be a lie that is
+   hard to unpick later. The consequence is that a mod expense with no merchant is titled by
+   its category in the ledger.
+9. **`expenses.mod_plan_id` is optional in the zod schema, not nullable-with-a-default.** Absent
+   and null mean different things: the mark-installed flow sends the id, and the ledger's edit
+   form does not send the field at all, so `toRow` leaves the column alone. Without that
+   distinction, fixing a typo in the merchant of a mod expense would silently unlink it from
+   the mod it paid for. There is a check for this in the HTTP probe above; it is the one
+   regression in this phase that would be invisible until the planning-accuracy figure moved.
+10. **The plan route's FAB slot returns `null` and the board draws its own.** The sheet the FAB
+    opens needs the board's other cards — a dependency has to point at one — and the slot is a
+    sibling of the page, not a child. So `components/ui/fab.tsx` is new, holds the one
+    definition of the brick action, and **`QuickAdd` was refactored onto it**. That is a change
+    to a Phase 2 file inside this branch; it is three lines and it exists so there are not two
+    hand-drawn FABs that must look identical.
+11. **Mod writes are awaited; only drags are optimistic.** A mod is created once and edited
+    rarely, and the one error this form produces that a person has to read — the named loop —
+    only exists once the server has looked at the whole board. A sheet that had already closed
+    could not show it. Drags are the opposite: many, small, and instantly reversible.
+12. **The cycle check is in TypeScript, not a trigger**, which is what `docs/02-DATA-MODEL.md`
+    asks for. `lib/mods/graph.ts` is pure, takes the edge set *as it would be after the write*,
+    and returns the loop as a path so it can be read out in names. It is unit-tested, including
+    the diamond that is not a loop, the loop that does not pass through the mod being changed,
+    and the graph that is already cyclic somewhere else.
+13. **A dependency must be a live mod on the same vehicle.** RLS already stops one pointing at
+    somebody else's mod; this also stops one pointing at a different car of your own, which RLS
+    would allow and no screen could ever show you.
+14. **"Mods & Parts" is found by name, then by bucket.** Categories are renameable, so a rename
+    must not start filing coilovers under Groceries. The fallback is the first live
+    `car_project` category. With no project category at all the form opens with the category
+    chips unanswered rather than guessing.
+15. **One currency per board.** A mod or an expense recorded in a currency other than the
+    profile's base is excluded from the figures rather than converted, because no rate is stored
+    on the row (CLAUDE.md section 5). Same rule, same reason, as `v_vehicle_totals` in Phase 3.
+16. **`v_mod_board_totals` uses `grouping sets`, and a null status is the whole board.**
+    `mod_plans.status` is `not null`, so null can only ever mean the rollup. One query answers
+    both the strip at the top and the count and subtotal in each column header.
+17. **`mod_reorder` takes the date as a parameter rather than using `current_date`.** The
+    server's clock is UTC and the app's day is Asia/Ho_Chi_Minh; at half past midnight in Ho Chi
+    Minh City those are different dates, and `installed_on` would be wrong for half an hour
+    every night.
+18. **In before/after, the hero photo is "before" and the inspiration photo is "after".** The
+    photograph of the thing you have not bought yet is the one you drag towards yourself. The
+    picker offers the twenty-four most recent inspiration photos on the car, labelled by the mod
+    they belong to; it is hidden entirely when there is no hero photo or no inspiration photo.
+19. **The slider is fetched after the page is interactive.** `/garage/[vehicleId]` is the one
+    route already over the ceiling, and the comparison is a thing you reach for rather than read
+    on arrival. The heading and the reserved 16:9 box render on the server, so the section does
+    not appear out of nowhere and nothing on the page moves when the images land.
+20. **A column's subtotal is hidden when it is zero.** A column of three mods nobody has priced
+    reads `3` with no figure, rather than `3 · 0 ₫`, which would be a claim rather than a gap.
+21. **Twelve links and twenty dependencies per mod.** The schema has no opinion; these are the
+    numbers past which a plan is a different kind of document.
+22. **Expense writes now revalidate `/garage`.** They did not before, which was already slightly
+    wrong for the vehicle totals and is plainly wrong once an expense moves a card's actual and
+    the planning-accuracy figure that reads it.
+23. **Links get an "Open" affordance only when the URL parses as `http(s)`.** The schema refuses
+    `javascript:` and `data:` outright — these strings end up in an `href` on a page the user
+    trusts — and the affordance is hidden for a half-typed address so a tap cannot go somewhere
+    nobody meant.
+
+### Docs
+
+**Nothing under `docs/` was edited, because this phase pre-approved no edit.** One divergence
+needs recording, and it is the first thing to look at:
+
+- **Migration `0015` adds two views and two functions that `docs/02-DATA-MODEL.md` does not
+  name** — `v_mod_costs`, `v_mod_board_totals`, `mod_board()` and `mod_reorder()`. CLAUDE.md
+  section 1 point 4 says changing the schema means a new migration *plus* an edit to that
+  document in the same commit, and rule 9 of this run says never edit anything under `docs/`
+  without pre-approval. The two rules point in opposite directions here and the run rule won,
+  so the code diverges from the document rather than the document being rewritten to match the
+  code. **The document needs four entries added under "Views and functions" before this is
+  merged**, and they are the only outstanding doc debt from this phase. No table, column, enum
+  or constraint changed, so the rest of the document is still accurate.
+- `docs/03-DESIGN.md`'s canonical icon table has no drag row; see assumption 6.
+
+### Migration
+
+**One, and it needs a push.** `supabase db push` is blocked in this run, so:
+
+- `0015_mod_planner.sql` — `v_mod_costs`, `v_mod_board_totals`, the `mod_board()` and
+  `mod_reorder()` functions, and their grants. **No table changes, no new columns, no new
+  enums, no data touched.** It replays clean from zero and it is purely additive, so it can be
+  pushed before or after the deploy without a window where the app is broken.
+
+`lib/supabase/types.ts` was regenerated (`npm run db:types`) and is committed with it.
+
+### Not built, and why
+
+- **The stamp treatment for an installed mod.** Signature element 3 in `docs/03-DESIGN.md`, and
+  it is listed under roadmap Phase 8 ("stamps"). An installed mod is an ordinary card and an
+  ordinary timeline row until then. It is the single thing that would most improve the
+  acceptance criterion, and it is somebody else's phase.
+- **Funds.** "When a linked mod is marked installed, the fund is drawn down" is section G of
+  `docs/01-PRODUCT.md` and roadmap Phase 7. `funds.mod_plan_id` exists and is untouched.
+- **Anything on the ledger row saying an expense belongs to a mod.** The link is stored and read
+  in both directions, but the ledger's detail line is fixed at bucket · category · vehicle
+  (`docs/03-DESIGN.md`, "The ledger detail line") and adding a fourth field would push one of
+  the three off a line that already truncates. A glyph would need a row in the icon table.
+- **Reordering inspiration photos by dragging.** `<AttachmentField>` still uses the Earlier and
+  Later buttons from Phase 4. The board's drag is column geometry and does not transfer to a
+  list inside a scrolling sheet, which is the case that made those two buttons the right answer
+  in the first place.
+- **A sweep for orphaned storage objects.** Owed since Phase 3, and this phase adds no new
+  source of them — a photo taken off a mod deletes its object, and an archived mod keeps both.
+- **Board virtualisation.** A column of forty cards would render forty cards. `CLAUDE.md`
+  section 3 asks for virtualisation over forty rows, and a plan that long is not a shape anyone
+  has yet; when it is, the fix is `content-visibility` on the card, the way the feed does it,
+  not the ledger's fixed-height arithmetic.
+
+### Where confidence is low
+
+- **Nothing was driven through a real browser, again, and this is the phase where that matters
+  most.** Every route, every server action, the RLS boundary and the rendered markup were
+  exercised over HTTP against the production build, and the geometry the drop depends on is
+  unit-tested — but **the drag itself has never been touched by a finger**. Pointer capture on
+  the handle, the window listeners the capture bubbles to, the auto-scroll near the edge of the
+  carousel, and whether the insertion rule reads as "it will go here" are all reasoned about
+  rather than felt. If one thing in this phase is broken on a real phone, it is this.
+- **`insertionIndex` is tested; `locate` is not.** The pure half — where a pointer at *y* lands
+  among a set of midpoints — has eight tests. The half that reads `getBoundingClientRect` off
+  five columns and picks the nearest one cannot be tested without layout, and it is where a
+  wrong answer would look like the board ignoring you.
+- **The 44px handle on a 272px column is a guess about proportion.** It clears the touch floor
+  and leaves roughly 210px for the card's own content, which is about thirty characters of
+  title. On the widest dong amounts a card's money line may wrap.
+- **`/garage/[vehicleId]` is still over the route ceiling**, now 45.7KB against 40KB. This phase
+  added 0.3KB of it. The breakdown and the reason are in the Phase 5 section of this file and
+  neither has changed: it is the one screen in the app that renders a feed of photographs.
+- **Concurrent drags are not serialised.** `mod_reorder` applies one drag atomically, but two
+  drags in flight at once from two tabs would each renumber from their own view of the board and
+  the last one would win. It is a single-user app and the failure mode is a column in an order
+  you did not intend, fixable by dragging again.
+- **The dependency picker offers installed mods too.** Depending on something already on the car
+  is harmless — it is never a blocker — and filtering them out would hide a legitimate "this
+  goes on top of that" statement of fact. It does make the list longer on a mature board.
+- **`planningAccuracyReading` rounds to whole per cent**, so a ratio a hair off 1.0 reads "You
+  spend about what you plan." That is deliberate — "0% more" says nothing twice — but it means
+  the sentence and the percentage next to it can look like they disagree at 100.4%.
+- **The estimate midpoint truncates.** `(min + max) / 2` in bigint drops the odd minor unit, so
+  a 1–2 VND range estimates at 1. Immaterial in dong; worth knowing in a two-decimal currency.
+
+### What a reviewer should check first
+
+1. **The four missing entries in `docs/02-DATA-MODEL.md`**, per the Docs section above. It is
+   the one place this branch knowingly diverges from the contract, and it is a doc edit rather
+   than a code change.
+2. **`supabase db push` for `0015_mod_planner.sql`**, after a backup as usual. Additive, no data
+   touched.
+3. **Drag a card on your actual phone.** Within a column, then across two columns, then to the
+   far column so the track has to scroll itself under your finger. Then drop one into Installed
+   and check the expense sheet opens with the right number in it. This is the least-verified
+   thing in the phase by a distance.
+4. **Plan a mod you actually want, with an estimate and a photograph, and look at the build
+   sheet.** That is the acceptance criterion and only a person can judge it. If the total makes
+   you want to fund it, the phase worked; if it makes you want to close the app, the caption is
+   doing the wrong job.
+5. **Mark it installed, save the expense, and check the variance.** Then add a second expense to
+   the same mod from the ledger and check the actual moves and the mod link survives the edit.
+6. **Planning accuracy against your own arithmetic** — it is actuals over estimate midpoints
+   across installed mods only, and mods with no estimate are in neither sum.
+7. **The before/after slider with a real photograph of your car**, which is the one part of this
+   phase whose whole point is how it looks.

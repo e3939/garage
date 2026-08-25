@@ -460,3 +460,72 @@
     overflow: hidden;
   }
 }
+
+@layer components {
+  /* ---------------------------------------------------------------------
+     The mod board.
+
+     Five columns as a horizontally snapping carousel rather than a five-up
+     grid: at 390px, five columns inside the gutter give each one about
+     seventy pixels, which is not a card. So the track bleeds to the screen
+     edges -- the negative margin is exactly the gutter `.safe-x` applies --
+     and each column is a snap point wide enough to read.
+
+     The scrollbar is hidden because the snap points already say there is more
+     to the right, and a scrollbar over a paper background is the one piece of
+     chrome in the app that cannot be made to look like ink.
+     --------------------------------------------------------------------- */
+  .board-track {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding-left: max(var(--gutter), env(safe-area-inset-left));
+    padding-right: max(var(--gutter), env(safe-area-inset-right));
+    margin-left: calc(-1 * max(var(--gutter), env(safe-area-inset-left)));
+    margin-right: calc(-1 * max(var(--gutter), env(safe-area-inset-right)));
+  }
+
+  .board-track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .board-column {
+    flex: 0 0 min(78vw, 272px);
+    scroll-snap-align: start;
+  }
+
+  /* Where the card will land: an ink rule between two cards. It is absolutely
+     positioned so drawing it costs the column no layout, which is what keeps
+     the drop target from oscillating while the finger holds still. */
+  .board-drop {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    border-radius: var(--r-full);
+    background-color: var(--accent);
+  }
+
+  /* The card under the finger. Fixed to the viewport and out of the way of
+     hit testing, so what is under the pointer is always the board. */
+  .board-ghost {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 40;
+    pointer-events: none;
+    opacity: 0.95;
+  }
+
+  /* The tilt is a transform like every other one in the app, so it goes when
+     transforms are unwelcome. The drag itself is not motion the app chose. */
+  @media (prefers-reduced-motion: reduce) {
+    .board-ghost {
+      transform: none;
+    }
+  }
+}

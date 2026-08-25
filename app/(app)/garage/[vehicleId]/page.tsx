@@ -3,9 +3,10 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { BeforeAfterLoader } from '@/components/mods/before-after-loader'
 import { timelineKindIcons } from '@/components/timeline/kind-icons'
 import { TimelineFeed } from '@/components/timeline/timeline-feed'
-import { Total } from '@/components/totals/total'
+import { Stat, Total } from '@/components/totals/total'
 import { ViewSwitcher } from '@/components/totals/view-switcher'
 import { ServicePanel } from '@/components/vehicles/service-panel'
 import { VehicleHero } from '@/components/vehicles/vehicle-hero'
@@ -15,8 +16,11 @@ import { monthLabel } from '@/lib/dates-display'
 import type { RawSearchParams } from '@/lib/expenses/filters'
 import { fetchProfilePreferences, fetchUserId } from '@/lib/queries/profile'
 import { fetchTimelinePage } from '@/lib/queries/timeline'
+import { fetchBuildSheetTotal, fetchInspirationPhotos } from '@/lib/queries/mods'
 import { fetchVehicle, fetchVehicleMonthTotals, fetchVehicleTotals } from '@/lib/queries/vehicles'
 import { signedUrl } from '@/lib/storage/signed-url'
+import { formatMoney } from '@/lib/money'
+import { planningAccuracyReading } from '@/lib/mods/types'
 import { parseSpendView, SPEND_VIEW_PARAM } from '@/lib/views'
 
 export const metadata: Metadata = { title: 'Vehicle' }
@@ -60,13 +64,16 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   const view = parseSpendView(firstParam(raw[SPEND_VIEW_PARAM]), preferences.defaultView)
   const month = monthStart(todayIso())
 
-  const [totals, monthTotals, heroUrl, timeline, userId] = await Promise.all([
-    fetchVehicleTotals(vehicle.id, preferences.baseCurrency),
-    fetchVehicleMonthTotals(vehicle.id, month, preferences.baseCurrency),
-    signedUrl('vehicles', vehicle.hero_photo_path),
-    fetchTimelinePage(vehicle.id),
-    fetchUserId(),
-  ])
+  const [totals, monthTotals, heroUrl, timeline, userId, planTotals, inspiration] =
+    await Promise.all([
+      fetchVehicleTotals(vehicle.id, preferences.baseCurrency),
+      fetchVehicleMonthTotals(vehicle.id, month, preferences.baseCurrency),
+      signedUrl('vehicles', vehicle.hero_photo_path),
+      fetchTimelinePage(vehicle.id),
+      fetchUserId(),
+      fetchBuildSheetTotal(vehicle.id, preferences.baseCurrency),
+      fetchInspirationPhotos(vehicle.id),
+    ])
 
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(raw)) {
@@ -76,6 +83,12 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   }
 
   const kmDriven = totals.km_driven.toLocaleString(preferences.locale)
+
+  const accuracy = totals.planning_accuracy
+  const accuracyReading = planningAccuracyReading(accuracy)
+
+  /** Only the photographs that actually signed. A broken frame is worse than none. */
+  const comparable = inspiration.filter((photo) => photo.url !== null)
 
   return (
     <div className="space-y-6">
@@ -121,6 +134,32 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         />
       </div>
 
+      <Stat
+        name="Planning accuracy"
+        view="All-in"
+        context="Installed mods"
+        caption={
+          accuracyReading ??
+          'No installed mod has an estimate to compare against yet. The board is where estimates go.'
+        }
+      >
+        {accuracy === null ? (
+          <span className="font-mono text-odometer text-ink-faint" aria-label="Not enough data yet">
+            &mdash;
+          </span>
+        ) : (
+          <span className="font-mono text-odometer text-ink">{`${Math.round(accuracy * 100)}%`}</span>
+        )}
+      </Stat>
+
+      {heroUrl && comparable.length > 0 ? (
+        <BeforeAfterLoader
+          heroUrl={heroUrl}
+          vehicleName={vehicle.nickname}
+          photos={comparable}
+        />
+      ) : null}
+
       <ServicePanel />
 
       <nav aria-label="This vehicle">
@@ -132,6 +171,19 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
             >
               <span className="text-body text-ink">Expenses</span>
               <span className="text-caption text-ink-muted">Every row for this car</span>
+            </Link>
+          </li>
+          <li className="border-t border-border">
+            <Link
+              href={`/garage/${vehicle.id}/plan` as Route}
+              className="flex min-h-touch items-center justify-between gap-4 px-4 py-3"
+            >
+              <span className="text-body text-ink">Mod plan</span>
+              <span className="text-caption text-ink-muted">
+                {planTotals.mods === 0
+                  ? 'Nothing planned yet'
+                  : `${planTotals.mods} ${planTotals.mods === 1 ? 'mod' : 'mods'} · ${formatMoney(planTotals.estimate_total, preferences.baseCurrency, { locale: preferences.locale })}`}
+              </span>
             </Link>
           </li>
           <li className="border-t border-border">
@@ -160,7 +212,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       </section>
 
       <p className="text-caption text-ink-muted">
-        The mod board arrives in Phase 5, and service, fuel and parts in Phase 6.
+        Service, fuel and parts arrive in Phase 6.
       </p>
     </div>
   )

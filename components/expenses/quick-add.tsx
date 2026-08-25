@@ -4,6 +4,7 @@
 import { useState } from 'react'
 
 import { ExpenseForm, type ExpenseFormProps } from '@/components/expenses/expense-form'
+import { Fab } from '@/components/ui/fab'
 import { Sheet } from '@/components/ui/sheet'
 import { Plus } from '@/components/icons'
 
@@ -22,19 +23,9 @@ export function QuickAdd(props: QuickAddProps) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={[
-          'fixed bottom-nav right-4 z-30 flex size-fab items-center justify-center',
-          'rounded-full bg-accent text-accent-ink',
-          'transition-transform duration-state ease-enter active:scale-[0.96]',
-        ].join(' ')}
-        style={{ marginBottom: 'calc(var(--space-4) + env(safe-area-inset-bottom))' }}
-      >
+      <Fab onClick={() => setOpen(true)} label="Log expense">
         <Plus size={24} weight="bold" aria-hidden />
-        <span className="sr-only">Log expense</span>
-      </button>
+      </Fab>
 
       <Sheet open={open} onClose={() => setOpen(false)} title="Log expense">
         {open ? <ExpenseForm mode="create" onDone={() => setOpen(false)} {...props} /> : null}

@@ -125,6 +125,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "attachments_mod_plan_id_fkey"
+            columns: ["mod_plan_id"]
+            isOneToOne: false
+            referencedRelation: "v_mod_costs"
+            referencedColumns: ["mod_plan_id"]
+          },
+          {
             foreignKeyName: "attachments_part_id_fkey"
             columns: ["part_id"]
             isOneToOne: false
@@ -334,6 +341,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "expenses_mod_plan_id_fkey"
+            columns: ["mod_plan_id"]
+            isOneToOne: false
+            referencedRelation: "v_mod_costs"
+            referencedColumns: ["mod_plan_id"]
+          },
+          {
             foreignKeyName: "expenses_recurring_id_fkey"
             columns: ["recurring_id"]
             isOneToOne: false
@@ -526,6 +540,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "funds_mod_plan_id_fkey"
+            columns: ["mod_plan_id"]
+            isOneToOne: false
+            referencedRelation: "v_mod_costs"
+            referencedColumns: ["mod_plan_id"]
+          },
+          {
             foreignKeyName: "funds_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
@@ -620,11 +641,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "mod_dependencies_depends_on_id_fkey"
+            columns: ["depends_on_id"]
+            isOneToOne: false
+            referencedRelation: "v_mod_costs"
+            referencedColumns: ["mod_plan_id"]
+          },
+          {
             foreignKeyName: "mod_dependencies_mod_plan_id_fkey"
             columns: ["mod_plan_id"]
             isOneToOne: false
             referencedRelation: "mod_plans"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mod_dependencies_mod_plan_id_fkey"
+            columns: ["mod_plan_id"]
+            isOneToOne: false
+            referencedRelation: "v_mod_costs"
+            referencedColumns: ["mod_plan_id"]
           },
         ]
       }
@@ -782,6 +817,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mod_plans"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parts_mod_plan_id_fkey"
+            columns: ["mod_plan_id"]
+            isOneToOne: false
+            referencedRelation: "v_mod_costs"
+            referencedColumns: ["mod_plan_id"]
           },
           {
             foreignKeyName: "parts_sale_expense_id_fkey"
@@ -1315,6 +1357,68 @@ export type Database = {
           },
         ]
       }
+      v_mod_board_totals: {
+        Row: {
+          actual_total: number | null
+          currency: string | null
+          estimate_max_total: number | null
+          estimate_min_total: number | null
+          estimate_total: number | null
+          mods: number | null
+          status: Database["public"]["Enums"]["mod_status"] | null
+          user_id: string | null
+          vehicle_id: string | null
+          without_estimate: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mod_plans_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "mod_plans_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_mod_costs: {
+        Row: {
+          actual: number | null
+          currency: string | null
+          est_cost_max: number | null
+          est_cost_min: number | null
+          estimate: number | null
+          expense_count: number | null
+          mod_plan_id: string | null
+          priority: Database["public"]["Enums"]["mod_priority"] | null
+          status: Database["public"]["Enums"]["mod_status"] | null
+          user_id: string | null
+          variance: number | null
+          vehicle_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mod_plans_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "mod_plans_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_month_totals: {
         Row: {
           all_in_count: number | null
@@ -1428,6 +1532,36 @@ export type Database = {
           vehicle_id: string
           vehicle_nickname: string
         }[]
+      }
+      mod_board: {
+        Args: { p_vehicle_id: string }
+        Returns: {
+          actual: number
+          board_order: number
+          created_at: string
+          currency: string
+          depends_on: Json
+          description: string
+          est_cost_max: number
+          est_cost_min: number
+          estimate: number
+          expense_count: number
+          id: string
+          installed_on: string
+          links: Json
+          notes: string
+          photos: Json
+          priority: Database["public"]["Enums"]["mod_priority"]
+          status: Database["public"]["Enums"]["mod_status"]
+          target_date: string
+          title: string
+          variance: number
+          vehicle_id: string
+        }[]
+      }
+      mod_reorder: {
+        Args: { p_moves: Json; p_today: string; p_vehicle_id: string }
+        Returns: number
       }
       timeline_page: {
         Args: {

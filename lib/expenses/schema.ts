@@ -32,6 +32,22 @@ const optionalUuid = z
   .default(null)
 
 /**
+ * A foreign key the form may or may not know about.
+ *
+ * Absent is not the same as null here. The mark-installed flow sends
+ * `mod_plan_id` and the ledger's edit form does not, and an edit that quietly
+ * shipped `null` for a field it never displayed would unlink an expense from the
+ * mod it paid for the first time somebody fixed a typo in the merchant. So this
+ * one is optional rather than defaulted, and the action leaves the column alone
+ * when it is missing.
+ */
+const linkedUuid = z
+  .union([z.uuid(), z.literal('')])
+  .transform((value) => (value === '' ? null : value))
+  .nullable()
+  .optional()
+
+/**
  * Money is a whole number of minor units and is never zero: an expense of
  * nothing is a mistake, not a record. Negative is allowed and meaningful —
  * a refund, or a part sold on.
@@ -61,6 +77,7 @@ export const expenseWriteSchema = z
     merchant: optionalText(160),
     note: optionalText(2000),
     odometer_km: z.number().int().min(0).max(9_999_999).nullable().default(null),
+    mod_plan_id: linkedUuid,
   })
   .refine(
     (value) => (value.bucket === 'life' ? value.vehicle_id === null : value.vehicle_id !== null),

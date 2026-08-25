@@ -46,9 +46,30 @@ const AttachmentField = dynamic(
   },
 )
 
+/**
+ * A create-mode form opened with some of the answers already known.
+ *
+ * The one caller today is "Mark installed" on the mod board, which knows the
+ * amount (the estimate midpoint), the car, the bucket, the category and the mod
+ * the expense pays for. Everything here is a starting value, not a lock: the
+ * form is the same form and every field is still editable.
+ */
+export type ExpensePrefill = {
+  /** Minor units, put back into the field the way it would have been typed. */
+  amount?: number | null
+  categoryId?: string
+  vehicleId?: string
+  bucket?: ExpenseBucket
+  occurredOn?: IsoDate
+  /** Written to `expenses.mod_plan_id`, which is what links plan to actual. */
+  modPlanId?: string
+}
+
 export type ExpenseFormProps = {
   mode: 'create' | 'edit'
   initial?: LedgerRow | null
+  /** Only read on a create. An edit starts from the row it is editing. */
+  prefill?: ExpensePrefill
   categories: readonly CategoryOption[]
   /** Category icons, drawn by a Server Component so Phosphor stays off the wire. */
   icons: Record<string, ReactNode>
@@ -84,16 +105,23 @@ function defaults(
   categories: readonly CategoryOption[],
   today: IsoDate,
   locale: string,
+  currency: string,
+  prefill?: ExpensePrefill,
 ): Values {
   if (!initial) {
     return {
-      amountText: '',
-      categoryId: '',
-      occurredOn: today,
-      vehicleId: '',
+      amountText:
+        prefill?.amount === undefined || prefill.amount === null
+          ? ''
+          : formatAmount(prefill.amount, currency, { locale }),
+      categoryId: prefill?.categoryId ?? '',
+      occurredOn: prefill?.occurredOn ?? today,
+      vehicleId: prefill?.vehicleId ?? '',
       merchant: '',
       note: '',
-      bucketOverride: '',
+      // Stated rather than inferred: the mod board knows this is project spend
+      // whatever the category happens to default to.
+      bucketOverride: prefill?.bucket ?? '',
       countsOverride: '',
       amortizeMonths: 1,
       odometerKm: '',
@@ -127,6 +155,7 @@ function defaults(
 export function ExpenseForm({
   mode,
   initial,
+  prefill,
   categories,
   icons,
   vehicles,
@@ -152,7 +181,7 @@ export function ExpenseForm({
   }, [initialAttachments])
 
   const { register, handleSubmit, watch, setValue, formState } = useForm<Values>({
-    defaultValues: defaults(initial, categories, today, locale),
+    defaultValues: defaults(initial, categories, today, locale, currency, prefill),
   })
 
   // An expense that carries an override is one where the category's own answer
@@ -160,9 +189,9 @@ export function ExpenseForm({
   // already expanded: on that expense the one-line summary is not the whole
   // story. Everything else starts collapsed.
   const overridden = useMemo(() => {
-    const start = defaults(initial, categories, today, locale)
+    const start = defaults(initial, categories, today, locale, currency, prefill)
     return start.bucketOverride !== '' || start.countsOverride !== ''
-  }, [initial, categories, today, locale])
+  }, [initial, categories, today, locale, currency, prefill])
 
   const [moreOpen, setMoreOpen] = useState(overridden)
   const [impactOpen, setImpactOpen] = useState(overridden)
@@ -316,6 +345,10 @@ export function ExpenseForm({
       merchant: trimmed(form.merchant),
       note: trimmed(form.note),
       odometer_km: bucket === 'life' || Number.isNaN(odometer) ? null : odometer,
+      // Only ever sent on a create from the mod board. Left off entirely
+      // otherwise, so editing an expense in the ledger cannot unlink it from the
+      // mod it paid for — see `linkedUuid` in `lib/expenses/schema.ts`.
+      ...(prefill?.modPlanId ? { mod_plan_id: prefill.modPlanId } : {}),
     }
 
     const row = draftLedgerRow(write, {
