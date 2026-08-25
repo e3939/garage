@@ -5,6 +5,7 @@ import type { LedgerCursor, LedgerRow } from '@/lib/expenses/types'
 import type { LedgerFilters } from '@/lib/expenses/filters'
 import { monthStart, todayIso, type IsoDate } from '@/lib/dates'
 import { DEFAULT_CURRENCY } from '@/lib/money'
+import { EMPTY_MONTH_TOTALS, type MonthViewTotals } from '@/lib/views'
 
 /** How many rows a ledger page holds. Also the point virtualisation kicks in. */
 export const LEDGER_PAGE_SIZE = 40
@@ -64,15 +65,17 @@ export async function fetchLedgerPage(
 export type MonthSummary = {
   month: IsoDate
   currency: string
-  /** Budget-impact total for the month, amortisation already applied. */
-  total: number
-  expenseCount: number
+  /** All three views of the month. The screen picks one and labels it. */
+  totals: MonthViewTotals
 }
 
 /**
- * The monthly figure. Read straight out of `v_monthly_impact`, which sums the
- * slices `v_expense_impact` produces — the only implementation of amortisation
- * in the system.
+ * The month, in all three views at once.
+ *
+ * `v_month_totals` computes the budget figure from `v_expense_impact` — the only
+ * implementation of amortisation in the system — and the two cash-out figures
+ * straight from `expenses` at full amount. Fetching all three costs one row and
+ * means flipping the switcher never waits on the network.
  */
 export async function fetchMonthSummary(
   month: IsoDate = monthStart(todayIso()),
@@ -81,19 +84,29 @@ export async function fetchMonthSummary(
   const supabase = await createClient()
 
   const { data, error } = await supabase
-    .from('v_monthly_impact')
-    .select('impact_month, currency, total, expense_count')
-    .eq('impact_month', month)
+    .from('v_month_totals')
+    .select(
+      'month, currency, monthly_total, monthly_count, all_in_total, all_in_count, car_only_total, car_only_count',
+    )
+    .eq('month', month)
     .eq('currency', currency)
     .maybeSingle()
 
-  if (error) throw new Error(`v_monthly_impact failed: ${error.message}`)
+  if (error) throw new Error(`v_month_totals failed: ${error.message}`)
 
+  return { month, currency, totals: monthTotalsFrom(data) }
+}
+
+/** Every column of a view is nullable to the type generator; a missing month is zero. */
+export function monthTotalsFrom(row: Partial<Record<keyof MonthViewTotals, number | null>> | null): MonthViewTotals {
+  if (!row) return EMPTY_MONTH_TOTALS
   return {
-    month,
-    currency,
-    total: data?.total ?? 0,
-    expenseCount: data?.expense_count ?? 0,
+    monthly_total: row.monthly_total ?? 0,
+    monthly_count: row.monthly_count ?? 0,
+    all_in_total: row.all_in_total ?? 0,
+    all_in_count: row.all_in_count ?? 0,
+    car_only_total: row.car_only_total ?? 0,
+    car_only_count: row.car_only_count ?? 0,
   }
 }
 

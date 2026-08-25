@@ -14,6 +14,8 @@
 import { impactInMonth } from '@/lib/budget'
 import type { IsoDate } from '@/lib/dates'
 import { matchesFilters, type LedgerFilters } from '@/lib/expenses/filters'
+import { monthStart } from '@/lib/dates'
+import { DEFAULT_SPEND_VIEW, type SpendView } from '@/lib/views'
 import type { ExpenseWrite } from '@/lib/expenses/schema'
 import type { CategoryOption, LedgerRow, VehicleOption } from '@/lib/expenses/types'
 
@@ -113,23 +115,78 @@ function impactOf(row: LedgerRow, month: IsoDate): number {
 }
 
 /**
- * What the writes in flight do to one month's budget figure. Rows in another
- * currency are ignored rather than added: money is never mixed without a stored
- * rate (CLAUDE.md section 5).
+ * What one row contributes to one month under one view — the client-side mirror
+ * of `v_month_totals`, and the only place the three views are computed outside
+ * SQL.
+ *
+ * Only the budget view amortises. A cash-out view uses the full amount on the
+ * day it was paid (docs/01-PRODUCT.md, core concept 2), and the car-only view
+ * ignores the budget switch entirely. That is what makes the same expense
+ * produce three different, correct figures.
+ */
+export function contributionInMonth(
+  row: LedgerRow,
+  month: IsoDate,
+  view: SpendView = DEFAULT_SPEND_VIEW,
+): number {
+  if (view === 'monthly') return impactOf(row, month)
+  if (row.is_draft) return 0
+  if (monthStart(row.occurred_on) !== monthStart(month)) return 0
+  if (view === 'car_only' && row.bucket === 'life') return 0
+  return row.amount
+}
+
+/**
+ * What the writes in flight do to one month's figure, under the view on screen.
+ * Rows in another currency are ignored rather than added: money is never mixed
+ * without a stored rate (CLAUDE.md section 5).
  */
 export function pendingMonthDelta(
   ops: readonly PendingOp[],
   month: IsoDate,
   currency: string,
+  view: SpendView = DEFAULT_SPEND_VIEW,
 ): number {
   let delta = 0
   for (const op of ops) {
     if (op.kind === 'delete') {
-      if (op.row.currency === currency) delta -= impactOf(op.row, month)
+      if (op.row.currency === currency) delta -= contributionInMonth(op.row, month, view)
       continue
     }
-    if (op.previous && op.previous.currency === currency) delta -= impactOf(op.previous, month)
-    if (op.row.currency === currency) delta += impactOf(op.row, month)
+    if (op.previous && op.previous.currency === currency) {
+      delta -= contributionInMonth(op.previous, month, view)
+    }
+    if (op.row.currency === currency) delta += contributionInMonth(op.row, month, view)
+  }
+  return delta
+}
+
+/**
+ * The same delta, restricted to one vehicle. The vehicle home's monthly figure
+ * has to move on a write the same way the app-wide one does.
+ */
+export function pendingVehicleMonthDelta(
+  ops: readonly PendingOp[],
+  vehicleId: string,
+  month: IsoDate,
+  currency: string,
+  view: SpendView = DEFAULT_SPEND_VIEW,
+): number {
+  const forVehicle = (row: LedgerRow) => (row.vehicle_id === vehicleId ? row : null)
+
+  let delta = 0
+  for (const op of ops) {
+    if (op.kind === 'delete') {
+      const row = forVehicle(op.row)
+      if (row && row.currency === currency) delta -= contributionInMonth(row, month, view)
+      continue
+    }
+    const previous = op.previous ? forVehicle(op.previous) : null
+    if (previous && previous.currency === currency) {
+      delta -= contributionInMonth(previous, month, view)
+    }
+    const row = forVehicle(op.row)
+    if (row && row.currency === currency) delta += contributionInMonth(row, month, view)
   }
   return delta
 }

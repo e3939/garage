@@ -26,7 +26,19 @@ import { join } from 'node:path'
 
 const PORT = Number(process.env.MEASURE_PORT ?? 3987)
 const ORIGIN = `http://127.0.0.1:${PORT}`
-const ROUTES = ['/today', '/ledger', '/garage', '/money', '/settings', '/settings/categories']
+/**
+ * `/garage/<id>` is filled in once the probe vehicle exists. The garage list and
+ * the vehicle form are separate routes and separate bundles, so both are weighed.
+ */
+const ROUTES = [
+  '/today',
+  '/ledger',
+  '/garage',
+  '/garage/new',
+  '/money',
+  '/settings',
+  '/settings/categories',
+]
 
 function stack() {
   const raw = execFileSync('npx', ['supabase', 'status', '-o', 'json'], {
@@ -64,7 +76,29 @@ async function signInToken({ apiUrl, secretKey }) {
   if (!link.ok) throw new Error(`generate link: ${link.status} ${await link.text()}`)
 
   const { hashed_token: hashedToken } = await link.json()
-  return hashedToken
+  const { id: userId } = await created.json()
+  return { hashedToken, userId }
+}
+
+/**
+ * The garage redirects an empty garage to the form, so a probe user with no cars
+ * would measure a redirect rather than the screen. One vehicle makes `/garage`
+ * and `/garage/<id>` real.
+ */
+async function probeVehicle({ apiUrl, secretKey }, userId) {
+  const response = await fetch(`${apiUrl}/rest/v1/vehicles`, {
+    method: 'POST',
+    headers: {
+      apikey: secretKey,
+      authorization: `Bearer ${secretKey}`,
+      'content-type': 'application/json',
+      prefer: 'return=representation',
+    },
+    body: JSON.stringify({ user_id: userId, nickname: 'Bundle probe', odometer_km: 10000 }),
+  })
+  if (!response.ok) throw new Error(`probe vehicle: ${response.status} ${await response.text()}`)
+  const [vehicle] = await response.json()
+  return vehicle.id
 }
 
 async function waitForServer() {
@@ -125,7 +159,10 @@ async function main() {
     throw new Error('no production build found — run `npm run build` first')
   }
 
-  const token = await signInToken(stack())
+  const local = stack()
+  const { hashedToken, userId } = await signInToken(local)
+  const vehicleId = await probeVehicle(local, userId)
+  ROUTES.splice(ROUTES.indexOf('/garage') + 1, 0, `/garage/${vehicleId}`)
 
   const server = spawn('npx', ['next', 'start', '-p', String(PORT)], {
     stdio: ['ignore', 'ignore', 'inherit'],
@@ -136,7 +173,7 @@ async function main() {
 
     const jar = {}
     const callback = await fetch(
-      `${ORIGIN}/auth/callback?token_hash=${token}&type=magiclink`,
+      `${ORIGIN}/auth/callback?token_hash=${hashedToken}&type=magiclink`,
       { redirect: 'manual' },
     )
     absorb(jar, callback)
@@ -168,8 +205,11 @@ async function main() {
       const own = sources
         .filter((src) => !shared.includes(src))
         .reduce((total, src) => total + gzippedBytes(src), 0)
+      const label = route.startsWith('/garage/') && route !== '/garage/new'
+        ? '/garage/[vehicleId]'
+        : route
       console.log(
-        `${route.padEnd(24)}${kb(own).padStart(7)}${kb(own + baseline).padStart(11)}`,
+        `${label.padEnd(24)}${kb(own).padStart(7)}${kb(own + baseline).padStart(11)}`,
       )
     }
   } finally {

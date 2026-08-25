@@ -5,23 +5,36 @@ import { categoryIconMap } from '@/components/expenses/category-icons'
 import { MonthTotal } from '@/components/expenses/month-total'
 import { LedgerList } from '@/components/ledger/ledger-list'
 import { ledgerSignalIcons } from '@/components/ledger/row-signals'
+import { ViewSwitcher } from '@/components/totals/view-switcher'
 import { monthStart, todayIso } from '@/lib/dates'
-import { EMPTY_FILTERS } from '@/lib/expenses/filters'
+import { EMPTY_FILTERS, type RawSearchParams } from '@/lib/expenses/filters'
 import { fetchRankedCategories } from '@/lib/queries/categories'
 import { fetchAmortiseThreshold, fetchLedgerPage, fetchMonthSummary } from '@/lib/queries/expenses'
 import { fetchProfilePreferences } from '@/lib/queries/profile'
 import { fetchVehicleOptions } from '@/lib/queries/vehicles'
+import { parseSpendView, SPEND_VIEW_PARAM } from '@/lib/views'
 
 export const metadata: Metadata = { title: 'Today' }
 
 /** How much of the ledger the month-at-a-glance panel shows before deferring. */
 const RECENT_ROWS = 6
 
-export default async function TodayPage() {
+type TodayPageProps = {
+  searchParams: Promise<RawSearchParams>
+}
+
+function firstParam(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) return value[0] ?? null
+  return value ?? null
+}
+
+export default async function TodayPage({ searchParams }: TodayPageProps) {
   const today = todayIso()
   const month = monthStart(today)
+  const raw = await searchParams
 
   const preferences = await fetchProfilePreferences()
+  const view = parseSpendView(firstParam(raw[SPEND_VIEW_PARAM]), preferences.defaultView)
 
   const [summary, recent, categories, vehicles, amortiseThreshold] = await Promise.all([
     fetchMonthSummary(month, preferences.baseCurrency),
@@ -33,9 +46,12 @@ export default async function TodayPage() {
 
   return (
     <div className="space-y-6">
+      <ViewSwitcher view={view} />
+
       <MonthTotal
         month={month}
-        serverTotal={summary.total}
+        totals={summary.totals}
+        view={view}
         currency={preferences.baseCurrency}
         locale={preferences.locale}
       />

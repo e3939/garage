@@ -18,6 +18,12 @@ type LedgerRowButtonProps = {
   locale: string
   icon: ReactNode
   signals: LedgerSignalIcons
+  /**
+   * This row's odometer reading is below the vehicle's last known one. The
+   * reading was saved exactly as typed — a reading someone actually took is
+   * data — and this is the flag docs/02-DATA-MODEL.md asks for in its place.
+   */
+  lowOdometer?: boolean
   onOpen: () => void
 }
 
@@ -28,7 +34,14 @@ type LedgerRowButtonProps = {
  * (docs/03-DESIGN.md, "The ledger detail line"). The note is still there; it is
  * marked by a glyph at the end of the line and read in full in the detail sheet.
  */
-export function LedgerRowButton({ row, locale, icon, signals, onOpen }: LedgerRowButtonProps) {
+export function LedgerRowButton({
+  row,
+  locale,
+  icon,
+  signals,
+  lowOdometer = false,
+  onOpen,
+}: LedgerRowButtonProps) {
   const title = row.merchant ?? row.category_name ?? 'Expense'
   const detail = [row.merchant ? row.category_name : null, row.vehicle_nickname]
     .filter((part): part is string => Boolean(part))
@@ -69,7 +82,15 @@ export function LedgerRowButton({ row, locale, icon, signals, onOpen }: LedgerRo
             <span style={{ color: BUCKET_VAR[row.bucket] }}>{BUCKET_LABEL[row.bucket]}</span>
             {detail ? <span className="text-ink-muted">{` · ${detail}`}</span> : null}
           </span>
-          {/* One glyph per signal, always in this order, always at the end. */}
+          {/* One glyph per signal, always in this order, always at the end.
+              The odometer flag leads, because the other two say there is more
+              to read and this one says something may be wrong. */}
+          {lowOdometer ? (
+            <span className="shrink-0 text-attention">
+              {signals.lowOdometer}
+              <span className="sr-only">Odometer lower than the last reading</span>
+            </span>
+          ) : null}
           {row.note ? (
             <span className="shrink-0 text-ink-faint">
               {signals.note}
@@ -109,6 +130,13 @@ type LedgerDayHeadingProps = {
 /**
  * The subtotal is the whole day under the current filters, computed by
  * `ledger_page`, so it stays right when a day straddles a page boundary.
+ *
+ * It carries a view label like every other total in the app, and the label is a
+ * constant: a day's subtotal is cash out on that day, at full amount, whatever
+ * the budget switch says and whatever the expense was spread over. That is the
+ * all-in view by definition. The ledger is a register of what was paid, not a
+ * report, so the switcher does not appear on it — but the number still has to
+ * say which of the three it is (docs/01-PRODUCT.md).
  */
 export function LedgerDayHeading({ heading, total, currency, locale }: LedgerDayHeadingProps) {
   return (
@@ -117,7 +145,16 @@ export function LedgerDayHeading({ heading, total, currency, locale }: LedgerDay
       className="flex items-center justify-between gap-4 border-b border-border bg-surface-sunken px-4"
     >
       <span className="text-eyebrow font-display uppercase text-ink-muted">{heading}</span>
-      <Money amount={total} currency={currency} locale={locale} size="label" className="text-ink-muted" />
+      <span className="flex shrink-0 items-baseline gap-2">
+        <span className="text-eyebrow font-display uppercase text-ink-faint">All-in</span>
+        <Money
+          amount={total}
+          currency={currency}
+          locale={locale}
+          size="label"
+          className="text-ink-muted"
+        />
+      </span>
     </div>
   )
 }

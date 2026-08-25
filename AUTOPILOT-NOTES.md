@@ -788,3 +788,294 @@ untouched.
 5. **CLAUDE.md §3.** The budget is the part of this phase with the longest half-life. Check
    that 40KB per route is a ceiling you would actually enforce, and re-run
    `npm run build && npm run measure:bundles` to confirm the numbers on your machine.
+
+---
+
+## Phase 4 — Vehicles and the view switcher
+
+Branch: `feat/04-vehicles` (the roadmap names this branch `feat/vehicles` and calls it Phase 3;
+as in every phase before it the branch already existed under the other name when the run
+started and was left alone. The heading here follows the branch number so the sections in this
+file stay in order — it is roadmap Phase 3, "Vehicles and the view switcher").
+
+### What was built
+
+- **Vehicles, end to end.** One form creates and edits a car, and it is also the first-run
+  flow: `/garage` with an empty garage redirects to it. Only the nickname is required;
+  make, model, year, colour, purchase date, purchase price and the odometer sit on the first
+  screen, and trim, plate, fuel, transmission and the reading at purchase are behind **More**.
+  There is no delete — a car that stopped being yours did not stop having cost you money — so
+  the way out is archive, with an Undo toast and a "Return to the garage" button on the
+  archived vehicle's own edit screen.
+- **The hero photo, compressed before it leaves the phone.** Resized to a 1600px long edge and
+  re-encoded as WebP at roughly 400KB by `browser-image-compression`, with a real progress bar
+  for the compression pass and an "Uploading" state after it, straight to
+  `{user_id}/{vehicle_id}/{uuid}.webp` in the private `vehicles` bucket. It is served through
+  `lib/storage/signed-url.ts`, which holds a one-hour signed URL until five minutes before it
+  expires and signs a whole garage's worth in one request. Both the library and the Supabase
+  browser client are dynamically imported, so neither is in any route's initial JavaScript.
+- **Vehicle home.** Hero photo in a reserved 16:9 frame, spec strip
+  (`2019 · Honda · Civic · RS · CVT · Petrol`, with anything unknown left out rather than
+  dashed), the odometer with the date it was last read, and four figures: total invested, cost
+  per km, this month's car spend, and next service due — which says "Not set up", because
+  service is roadmap Phase 6.
+- **Three views of the same data, computed in SQL.** `v_month_totals` and
+  `v_vehicle_month_totals` carry all three figures for a month in one row, and
+  `v_vehicle_totals` carries the lifetime ones. The segmented control lives under the header
+  on `/today`, `/garage` and a vehicle's home, keeps its state in `?view=`, defaults from
+  `profiles.default_view` and writes back to it on every change. **Every total in the app now
+  renders a view label next to it**, including the ledger's day subtotals, which are labelled
+  `All-in` because that is what a day's cash out is.
+- **The odometer trigger.** `vehicles.odometer_km` is raised — never lowered — by any reading
+  on an expense, a fuel log or a service record, and it stamps `odometer_at` with the date. A
+  lower reading is stored exactly as typed and flagged instead: the expense form's odometer
+  field reads "Lower than last reading (41.200 km). Saved as typed." as you type it, and the
+  ledger row carries a `WarningCircle` at the end of its detail line.
+
+### Proof it works
+
+`npm test` — **148 hermetic tests**, ten of them new, covering the client-side mirror of the
+three views and the per-vehicle delta. `npm run test:db` — **84 against a database reset from
+zero**, eighteen of them new in `lib/queries/vehicles.db.test.ts`. `npm run typecheck`,
+`npm run lint` (0 errors) and `npm run build` all clean. `npx supabase db reset` replays all
+thirteen migrations from nothing.
+
+The acceptance criterion, asserted against Postgres from one fixed set of four expenses:
+
+| View | Figure | Why |
+|---|---|---|
+| Monthly | `2.000.000 ₫` | 150.000 groceries + 850.000 fuel + a twelfth of 12.000.000 of tyres. The 24.000.000 of coilovers is kept out of the budget. |
+| All-in | `37.000.000 ₫` | Everything, at full amount, on the day it was paid. |
+| Car only | `36.850.000 ₫` | All-in minus the groceries. The budget switch is ignored. |
+
+Three different figures, and the following month reads `1.000.000 / 0 / 0` — the second tyre
+slice, and no cash out at all — which is the rule that amortisation touches the budget view
+and nothing else.
+
+Cost per km, same fixture: a 620.000.000 car bought at 34.500km, now at 40.000km, with
+37.150.000 of car spend on it. `657.150.000 ÷ 5.500 = 119.427 ₫/km`, and that is what the view
+returns.
+
+Beyond the suites, the production build was driven over HTTP with a real session, including
+calling the Server Actions directly by their action ids:
+
+| Check | Result |
+|---|---|
+| `/garage`, `/garage/new`, `/garage/[id]`, `/garage/[id]/edit` signed in | 200, no error markup |
+| Empty garage at `/garage` | 307 to `/garage/new`, and that screen has no back link |
+| `/today` under `?view=monthly` / `all_in` / `car_only` | `2.300.000` / `37.300.000` / `37.150.000`, each with its label |
+| `?view=nonsense` | falls back to the profile's view rather than erroring |
+| `setDefaultViewAction('car_only')` | `profiles.default_view` moves, and `/today` with no param then opens on Car only |
+| `setDefaultViewAction('sideways')` | `{ok:false,"Unknown view"}`, profile untouched |
+| `createVehicleAction` | row written, `purchase_odometer_km` defaulted, `sort_order` at the end of the garage |
+| `createVehicleAction` with a blank nickname | rejected, "Give it a name" |
+| `createVehicleAction` with a purchase reading above the current one | rejected, "cannot be higher than the current reading" |
+| `updateVehicleAction` | nickname and odometer changed |
+| `setVehicleArchivedAction` | `archived_at` set, vehicle gone from `/garage`, Undo puts it back |
+| A 1600×900 WebP uploaded to `{user_id}/{vehicle_id}/{uuid}.webp` | rendered through `/_next/image?url=`, so the signed URL passes `remotePatterns` |
+| An unknown vehicle id | 404 |
+| A lower odometer reading on an expense | stored as 39.000, vehicle stays at 41.200, warning glyph on the row |
+
+### Assumptions
+
+1. **Cost per km divides total invested, not total spend.** The product document's closing
+   summary for a sold car lists "total owned cost, km driven, cost per km" in that order, so
+   the figure next to a total that includes the purchase price should be measured against the
+   same total. `v_vehicle_totals` exposes `total_spend` and `total_invested` separately, so
+   changing this is a one-line edit to the view rather than a rewrite.
+2. **`total_invested` and `purchase_price` are new columns on `v_vehicle_totals`.** The data
+   model names seven columns for that view and these are the eighth and ninth. They are sums
+   of columns already in it rather than new facts, so `docs/02-DATA-MODEL.md` was not edited
+   for them — the pre-approved doc edit was the `purchase_odometer_km` change and nothing else.
+3. **"Total invested" and "cost per km" are labelled `All-in` and do not move with the
+   switcher.** They are lifetime totals, and docs/01-PRODUCT.md says lifetime totals always
+   use the full amount on the purchase date. Amortising a lifetime total would be meaningless
+   and filtering it by the budget switch would be worse. They still carry a view label,
+   because the rule is that every total does.
+4. **The ledger has no switcher, and its day subtotals are labelled `All-in`.** A day's
+   subtotal is what was paid that day; there is no coherent "monthly" reading of one day, and
+   the ledger already has a bucket filter that does what a car-only view would. So the ledger
+   is a register, the label is a constant, and the switcher stays on the screens with totals
+   that respond to it.
+5. **"Lower than last reading (X km)" compares against the vehicle's current reading.** That
+   reading *is* the last one — the trigger only ever raises it — so the sentence is literally
+   true, and it needs no extra query and no change to `ledger_page`. The consequence is that
+   deliberately back-dating an expense to a month when the car really was on 30.000km also
+   raises the flag. The note is informational, the row is saved either way, and this was the
+   simpler reading.
+6. **A lower reading is flagged on the ledger row by a glyph, not by the sentence.**
+   docs/03-DESIGN.md is explicit that the detail line carries structured fields only and that
+   a signal which does not fit is carried by a glyph with screen-reader text. The full
+   sentence is one tap away, live, in the odometer field of the detail sheet. The glyph is
+   `WarningCircle` in `--attention`, and it leads the row's glyphs rather than following the
+   note and camera ones, because the other two say there is more to read and this one says
+   something may be wrong.
+7. **`v_vehicle_totals` is one row per vehicle, in the profile's base currency.** Amounts in
+   any other currency are excluded rather than converted, because no rate is stored on the row
+   (CLAUDE.md §5) and multi-currency conversion is on the roadmap's deferred list. A purchase
+   price recorded in another currency is excluded from `total_invested` for the same reason.
+8. **`planning_accuracy` takes the estimate as the midpoint of `est_cost_min` and
+   `est_cost_max`**, or whichever end exists when only one does. A mod with no estimate at all
+   is left out of both sums rather than counted as an infinite overrun. Nothing surfaces this
+   figure yet — the mod board is Phase 5 — but the view's contract in the data model includes
+   it, so it is built and tested.
+9. **`months_owned` is whole elapsed months and can be zero.** A car bought last week has been
+   owned for zero whole months. It is null when there is no purchase date. Nothing in this
+   phase renders it.
+10. **The odometer trigger is attached to all three tables the data model names**, including
+    `fuel_logs` and `service_records`, which hold nothing until Phase 6. The column's
+    definition is the max across all three; a trigger covering two of them is a column that is
+    quietly wrong the day the third starts being written to.
+11. **`purchase_odometer_km` is `not null` with a `<= odometer_km` check.** The trigger fills
+    it from `odometer_km` on insert when it is left out, so nothing has to think about it, and
+    the check is what stops `km_driven` from going negative. Editing a vehicle's current
+    reading down below its purchase reading is refused with a sentence rather than a
+    constraint name.
+12. **A vehicle always gets a colour.** The column is nullable but the form defaults to brick,
+    because the swatch is UI chrome and a car with no swatch leaves a hole in the garage list.
+13. **Vehicle writes are not optimistic.** Creating or editing a car awaits the action and
+    then navigates to the vehicle's home, which is a page that has to read the row that was
+    just written. Expenses are optimistic because they are logged in seconds many times a day;
+    a vehicle is created once. The month figures on the vehicle home and the garage cards *are*
+    optimistic, through the same queue as `/today`.
+14. **A photo uploaded and then abandoned is cleaned up by the browser**, through
+    `discardVehiclePhotoAction`, on Remove and on replacing one upload with another within the
+    same session. Closing the tab mid-form leaves an orphan object. A sweep for unreferenced
+    objects belongs with the attachments pipeline in Phase 4 of the roadmap.
+15. **"Add a vehicle" from the expense form is a link, and it says the form closes.** Quick add
+    is a `<dialog>`, so navigating away loses what was typed. The alternative is rendering the
+    whole vehicle form inside the quick-add sheet, which would put it in the bundle of every
+    route that carries the FAB. The copy states the consequence rather than leaving it to be
+    discovered.
+16. **The view switcher `replace`s rather than `push`es**, so flipping between the three views
+    four times and pressing back leaves the screen instead of walking backwards through four
+    readings of the same month. The write to `profiles` is fire-and-forget inside a
+    transition: if it fails the URL still carries the view and the screen is still correct.
+17. **The vehicle nickname is the screen title and is not repeated in the page body.** The
+    header is sticky and the hero is not, so printing the nickname in both would put the same
+    word on screen twice for the whole scroll. The consequence is that the vehicle home has no
+    `display-lg` on it; the type scale assigns that step to the vehicle nickname, and
+    `/garage/new` is where it actually appears, on "Add your car".
+18. **`components/settings/colour-picker.tsx` moved to `components/ui/colour-picker.tsx`.** It
+    is now used by categories and by vehicles, and CLAUDE.md §4 puts shared primitives in
+    `components/ui`.
+
+### Migrations
+
+**Three, and they need a push.** `supabase db push` is blocked in this run, so:
+
+- `0011_vehicle_purchase_odometer.sql` — adds `vehicles.purchase_odometer_km`, backfills it
+  from `odometer_km`, adds the BEFORE INSERT trigger that defaults it, makes it `not null`,
+  and adds the `<= odometer_km` check. **This is the pre-approved schema change, and
+  `docs/02-DATA-MODEL.md` is edited in the same commit.** It is backwards compatible: existing
+  rows are backfilled in the migration itself.
+- `0012_odometer_trigger.sql` — three trigger functions and three triggers, on `expenses`,
+  `fuel_logs` and `service_records`. No table changes.
+- `0013_vehicle_and_view_totals.sql` — `v_month_totals`, `v_vehicle_month_totals`,
+  `v_vehicle_totals`, and their grants. No table changes.
+
+All three replay clean from zero. Take the backup first, as usual; `0011` is the only one that
+touches data, and the only way it can fail is a pre-existing row where `odometer_km` is
+somehow negative.
+
+`lib/supabase/types.ts` was regenerated (`npm run db:types`) and is committed with them.
+
+### Not built, and why
+
+- **`v_timeline`, `v_service_due`, `v_fuel_consumption`.** Roadmap Phases 4 and 6. The service
+  panel on the vehicle home is in its final position and says "Not set up", as the phase brief
+  allows.
+- **The sold-vehicle closing summary.** Roadmap Phase 9 (`feat/import-export`). `status`,
+  `sold_date` and `sold_price` exist on the table and are untouched by this phase; the form
+  does not offer them. Archive is the only exit, and it is reversible.
+- **Sub-routes of a vehicle** — `plan`, `service`, `fuel`, `parts`. Phases 5 and 6. The
+  vehicle home links to the ledger filtered by that car and to its own edit screen, and says
+  in one line which phase brings the rest.
+- **Vehicle reordering by hand.** `sort_order` is written (new cars go to the end of the
+  garage) and respected, but there is no drag handle. Not in the phase brief, same as
+  categories in Phase 2.
+- **The odometer roll on the new figures.** Signature element 1, roadmap Phase 8. The recessed
+  `panel-sunken` bed every figure sits on is here; the digits do not roll yet.
+- **A sweep for orphaned storage objects**, per assumption 14.
+
+### Where confidence is low
+
+- **Route JavaScript grew by about 7KB on the two busiest routes, and the cause is chunking,
+  not code.** Measured with `npm run build && npm run measure:bundles`, this branch against its
+  parent commit built the same way in a temporary worktree:
+
+  | Route | Own JS before | Own JS after |
+  |---|---|---|
+  | `/today` | 29.6KB | 36.4KB |
+  | `/ledger` | 30.6KB | 37.4KB |
+  | `/garage` | 26.4KB | 34.9KB |
+  | `/garage/[vehicleId]` | — | 34.9KB |
+  | `/garage/new` | — | 22.5KB |
+  | `/money` | 26.4KB | 26.2KB |
+  | `/settings` | 0.0KB | 0.0KB |
+
+  Every route is under the 40KB ceiling and the shared baseline is unchanged at 139.4KB across
+  eight chunks, so nothing landed in the shell. But `/today` and `/ledger` did not gain 7KB of
+  new code — `/ledger` barely changed in this phase and `/money`, which carries the same
+  expense form, did not move at all. What happened is that **Turbopack now emits the expense
+  form into three chunks instead of one**: a shared one that `/money` also loads, plus a
+  route-specific copy on each of `/today` and `/ledger`. Three attempts to stop it failed —
+  removing the four `@fab/garage/**` slot files, swapping the two new `next/link` imports in
+  the expense form for plain anchors, and collapsing the FAB slot back to a single
+  `default.tsx` (that last one is kept, because it turned out the extra `default.tsx` files
+  were never needed: the slot falls back up the tree on its own). Per the three-strikes rule I
+  stopped there. **`/today` now has about 3KB of headroom, and Phase 4 puts a photo pipeline
+  on it.** If it needs reclaiming, the lever is the ledger's edit sheet: `LedgerList` imports
+  `ExpenseForm` statically, and that is the edge dragging the form into the route chunk.
+- **CLAUDE.md §3's example figures are now stale.** It says "today the widest route is
+  `/ledger` at 30.6KB, then `/today` at 29.6KB". The table above is the current answer. The
+  baseline sentence in that section is still correct and the budget itself has not moved, so
+  **the file was deliberately not edited** — that was not a pre-approved change and the
+  constitution is written by hand. It is a two-line update if you want it.
+- **Nothing was driven through a real browser, again.** Every route, every view, every server
+  action and the RLS boundary were exercised over HTTP against the production build, but the
+  compression progress bar, the file picker on iOS, the segmented control under a thumb and
+  the archive confirmation were reasoned about and server-rendered, not tapped. **The photo
+  pipeline is the part of this phase that most needs a real phone**, because HEIC is the one
+  input the library cannot decode and the only place it appears is a real camera roll. iOS
+  Safari converts to JPEG for an `accept="image/*"` picker, which is why this is expected to
+  work, but "expected to" is doing real work in that sentence.
+- **The compression settings were not tuned against a real photograph.** 1600px and 400KB come
+  from the phase brief; whether `browser-image-compression` reaches 400KB of WebP without
+  visibly wrecking a dark engine bay is a thing to look at rather than reason about. The two
+  numbers are `MAX_EDGE` and `MAX_MB` at the top of `components/vehicles/hero-photo-field.tsx`.
+- **The signed-URL cache is process-local and unbounded in time.** It holds up to 500 entries
+  and drops the oldest, and every entry is keyed by a storage path that begins with its
+  owner's user id, so one user's URL cannot be handed to another. On Vercel each instance
+  keeps its own; losing it costs one round trip. It is a memo, not a store.
+- **`loadLedgerPageAction` throws on a malformed filters argument.** Found by accident while
+  probing action ids: calling it with a string instead of a filters object returns a 500 with
+  a digest and no data. It is pre-existing, not from this phase, and nothing is disclosed —
+  but a Server Action is a public endpoint and that one does not parse its input with a zod
+  schema the way every write does.
+- **`/garage` redirecting an empty garage to `/garage/new` is a product decision made for a
+  budget reason as much as a design one.** Inline, the form put `/garage` at 40.7KB, over the
+  ceiling. On its own route it is 22.5KB and `/garage` is 34.9KB. The flow is arguably better
+  — tapping Garage with no cars lands you on the thing you came to do — but that is not why it
+  changed, and it is worth a second opinion.
+
+### What a reviewer should check first
+
+1. **Flip the switcher on `/today` with a real month of your own data.** Three figures, three
+   labels, and the Monthly one should be the only one that reacts to a spread expense. That is
+   the whole phase in one gesture.
+2. **Add a photo of your actual car from your actual phone.** Watch the progress bar, then
+   check the file that lands in the `vehicles` bucket is WebP, under about 400KB, and still
+   looks like the car. This is the least-verified thing in the phase.
+3. **Type an odometer reading lower than the last one.** The hint under the field should say
+   "Lower than last reading (X km). Saved as typed.", the expense should save, the vehicle's
+   figure should not move, and the ledger row should carry a warning glyph.
+4. **Check cost per km against your own arithmetic**, and specifically check that the reading
+   at purchase is what you expect on any car you entered before this phase — every existing
+   vehicle was backfilled with whatever `odometer_km` said at migration time, which for a car
+   already in use is *today's* reading, not the one it was bought at. **Edit it by hand under
+   More on the vehicle's edit screen.** This is the one piece of data the migration cannot get
+   right on its own.
+5. **The bundle table above**, and the 3KB of headroom on `/today` before Phase 4 starts.
+6. **Archive a car and undo it**, then confirm its expenses are all still in the ledger and
+   still attached to it.

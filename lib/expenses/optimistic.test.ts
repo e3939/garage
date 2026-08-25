@@ -4,7 +4,9 @@ import { EMPTY_FILTERS, type LedgerFilters } from '@/lib/expenses/filters'
 import {
   applyPending,
   buildLedgerItems,
+  contributionInMonth,
   pendingMonthDelta,
+  pendingVehicleMonthDelta,
   type PendingOp,
 } from '@/lib/expenses/optimistic'
 import type { LedgerRow } from '@/lib/expenses/types'
@@ -193,5 +195,128 @@ describe('pendingMonthDelta', () => {
     const before = row({ id: 'a', amount: 900_000, counts_toward_budget: true })
     const after = { ...before, counts_toward_budget: false }
     expect(pendingMonthDelta([{ kind: 'save', row: after, previous: before }], august, 'VND')).toBe(-900_000)
+  })
+})
+
+/**
+ * The three views, on the client.
+ *
+ * These figures are computed by `v_month_totals` and mirrored here only so a
+ * write can be seen before the server answers. The numbers below are the same
+ * ones `lib/queries/vehicles.db.test.ts` asserts against Postgres, on purpose:
+ * if the two ever disagree, the view is right and this is the bug.
+ */
+describe('the three views', () => {
+  const august = '2026-08-01'
+
+  const groceries = row({ id: 'g', amount: 150_000, bucket: 'life', counts_toward_budget: true })
+  const fuel = row({
+    id: 'f',
+    amount: 850_000,
+    bucket: 'car_running',
+    vehicle_id: 'car',
+    counts_toward_budget: true,
+  })
+  const mods = row({
+    id: 'm',
+    amount: 24_000_000,
+    bucket: 'car_project',
+    vehicle_id: 'car',
+    counts_toward_budget: false,
+  })
+  const tyres = row({
+    id: 't',
+    amount: 12_000_000,
+    bucket: 'car_running',
+    vehicle_id: 'car',
+    counts_toward_budget: true,
+    amortize_months: 12,
+  })
+
+  const all = [groceries, fuel, mods, tyres]
+  const sum = (view: 'monthly' | 'all_in' | 'car_only', month = august) =>
+    all.reduce((total, entry) => total + contributionInMonth(entry, month, view), 0)
+
+  it('produces three different figures from one set of expenses', () => {
+    expect(sum('monthly')).toBe(2_000_000)
+    expect(sum('all_in')).toBe(37_000_000)
+    expect(sum('car_only')).toBe(36_850_000)
+    expect(new Set([sum('monthly'), sum('all_in'), sum('car_only')]).size).toBe(3)
+  })
+
+  it('amortises the budget view and nothing else', () => {
+    const september = '2026-09-01'
+    expect(sum('monthly', september)).toBe(1_000_000)
+    expect(sum('all_in', september)).toBe(0)
+    expect(sum('car_only', september)).toBe(0)
+  })
+
+  it('keeps a kept-out expense out of the budget view only', () => {
+    expect(contributionInMonth(mods, august, 'monthly')).toBe(0)
+    expect(contributionInMonth(mods, august, 'all_in')).toBe(24_000_000)
+    expect(contributionInMonth(mods, august, 'car_only')).toBe(24_000_000)
+  })
+
+  it('keeps life spend out of the car-only view only', () => {
+    expect(contributionInMonth(groceries, august, 'monthly')).toBe(150_000)
+    expect(contributionInMonth(groceries, august, 'all_in')).toBe(150_000)
+    expect(contributionInMonth(groceries, august, 'car_only')).toBe(0)
+  })
+
+  it('ignores a draft in every view', () => {
+    const draft = row({ id: 'd', amount: 500_000, is_draft: true, counts_toward_budget: true })
+    expect(contributionInMonth(draft, august, 'monthly')).toBe(0)
+    expect(contributionInMonth(draft, august, 'all_in')).toBe(0)
+    expect(contributionInMonth(draft, august, 'car_only')).toBe(0)
+  })
+
+  it('moves the pending delta by the view on screen', () => {
+    const ops: PendingOp[] = [{ kind: 'save', row: mods, previous: null }]
+    expect(pendingMonthDelta(ops, august, 'VND', 'monthly')).toBe(0)
+    expect(pendingMonthDelta(ops, august, 'VND', 'all_in')).toBe(24_000_000)
+    expect(pendingMonthDelta(ops, august, 'VND', 'car_only')).toBe(24_000_000)
+  })
+
+  it('defaults to the budget view, which is what /today opened on before', () => {
+    const ops: PendingOp[] = [{ kind: 'save', row: mods, previous: null }]
+    expect(pendingMonthDelta(ops, august, 'VND')).toBe(
+      pendingMonthDelta(ops, august, 'VND', 'monthly'),
+    )
+  })
+})
+
+describe('pendingVehicleMonthDelta', () => {
+  const august = '2026-08-01'
+
+  const onCar = row({
+    id: 'f',
+    amount: 850_000,
+    bucket: 'car_running',
+    vehicle_id: 'car',
+    counts_toward_budget: true,
+  })
+  const onOtherCar = { ...onCar, id: 'o', vehicle_id: 'other' }
+  const life = row({ id: 'g', amount: 150_000, bucket: 'life', counts_toward_budget: true })
+
+  it('counts only the vehicle asked about', () => {
+    const ops: PendingOp[] = [
+      { kind: 'save', row: onCar, previous: null },
+      { kind: 'save', row: onOtherCar, previous: null },
+      { kind: 'save', row: life, previous: null },
+    ]
+    expect(pendingVehicleMonthDelta(ops, 'car', august, 'VND', 'all_in')).toBe(850_000)
+    expect(pendingVehicleMonthDelta(ops, 'other', august, 'VND', 'all_in')).toBe(850_000)
+  })
+
+  it('takes the amount off the car it moved away from', () => {
+    const moved = { ...onCar, vehicle_id: 'other' }
+    const ops: PendingOp[] = [{ kind: 'save', row: moved, previous: onCar }]
+    expect(pendingVehicleMonthDelta(ops, 'car', august, 'VND', 'all_in')).toBe(-850_000)
+    expect(pendingVehicleMonthDelta(ops, 'other', august, 'VND', 'all_in')).toBe(850_000)
+  })
+
+  it('removes a deleted row from its own car', () => {
+    const ops: PendingOp[] = [{ kind: 'delete', row: onCar }]
+    expect(pendingVehicleMonthDelta(ops, 'car', august, 'VND', 'monthly')).toBe(-850_000)
   })
 })

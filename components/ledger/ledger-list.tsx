@@ -86,6 +86,23 @@ export function LedgerList({
     return buildLedgerItems(applyPending(rows, store.pending, filters))
   }, [page, loaded, store.pending, filters])
 
+  /**
+   * `vehicles[].odometer_km` is the highest reading the app has ever seen for
+   * that car — the trigger in 0012 only ever raises it. So a row carrying a
+   * lower number is a row whose reading is below the last one, which is exactly
+   * the condition docs/02-DATA-MODEL.md asks the UI to flag rather than reject.
+   */
+  const lastReading = useMemo(
+    () => new Map(vehicles.map((vehicle) => [vehicle.id, vehicle.odometer_km])),
+    [vehicles],
+  )
+
+  function isBelowLastReading(row: LedgerRow): boolean {
+    if (row.vehicle_id === null || row.odometer_km === null) return false
+    const known = lastReading.get(row.vehicle_id)
+    return known !== undefined && row.odometer_km < known
+  }
+
   async function loadOlder() {
     if (loading || !loaded.cursor) return
     setLoading(true)
@@ -144,6 +161,7 @@ export function LedgerList({
                 locale={locale}
                 icon={item.row.category_icon ? icons[item.row.category_icon] : null}
                 signals={signals}
+                lowOdometer={isBelowLastReading(item.row)}
                 onOpen={() => setEditing(item.row)}
               />
             )

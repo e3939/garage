@@ -8,7 +8,7 @@ import {
   setCategoryArchivedAction,
   updateCategoryAction,
 } from '@/app/(app)/settings/categories/actions'
-import { ColourPicker } from '@/components/settings/colour-picker'
+import { ColourPicker } from '@/components/ui/colour-picker'
 import { IconPicker } from '@/components/settings/icon-picker'
 import { FALLBACK_ICON_NAME } from '@/components/icons/catalog-names'
 import { Button } from '@/components/ui/button'

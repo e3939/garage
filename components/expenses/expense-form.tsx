@@ -3,6 +3,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 
 import {
@@ -178,6 +179,19 @@ export function ExpenseForm({
   const forcedToLife =
     category !== null && category.default_bucket !== 'life' && bucket === 'life' && vehicle === null
 
+  /**
+   * The vehicle's stored reading is the highest the app has ever seen, because
+   * the trigger in migration 0012 only ever raises it. A lower number typed here
+   * is saved exactly as typed — a reading someone actually took is data, and an
+   * app that refuses it teaches them to lie to it — and flagged instead.
+   */
+  const typedOdometer = values.odometerKm.trim() === '' ? null : Number(values.odometerKm)
+  const belowLastReading =
+    vehicle !== null &&
+    typedOdometer !== null &&
+    Number.isFinite(typedOdometer) &&
+    typedOdometer < vehicle.odometer_km
+
   const suggestSpread =
     amortiseThreshold !== null && amount !== null && Math.abs(amount) > amortiseThreshold
 
@@ -316,10 +330,9 @@ export function ExpenseForm({
             <p className="text-caption text-ink-muted">
               {vehicles.length === 0
                 ? 'No vehicle in the garage yet, so this logs as life spend.'
-                : 'No vehicle attached, so this logs as life spend.'}
+                : 'No vehicle attached, so this logs as life spend.'}{' '}
               {vehicles.length > 0 ? (
                 <>
-                  {' '}
                   <button
                     type="button"
                     onClick={() => {
@@ -332,7 +345,18 @@ export function ExpenseForm({
                   </button>
                   .
                 </>
-              ) : null}
+              ) : (
+                // Leaves the sheet, and anything typed into it. Said plainly
+                // rather than discovered: the alternative is building the whole
+                // vehicle form a second time inside this one, on every route
+                // that carries the FAB.
+                <>
+                  <Link href="/garage/new" className="text-accent underline underline-offset-2">
+                    Add one
+                  </Link>{' '}
+                  — this form closes if you do.
+                </>
+              )}
             </p>
           ) : null}
         </div>
@@ -420,7 +444,11 @@ export function ExpenseForm({
               <Field
                 label="Odometer"
                 htmlFor="expense-odometer"
-                hint={`Last known reading ${vehicle.odometer_km.toLocaleString(locale)} km.`}
+                hint={
+                  belowLastReading
+                    ? `Lower than last reading (${vehicle.odometer_km.toLocaleString(locale)} km). Saved as typed.`
+                    : `Last known reading ${vehicle.odometer_km.toLocaleString(locale)} km.`
+                }
               >
                 <input
                   id="expense-odometer"

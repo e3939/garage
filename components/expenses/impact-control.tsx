@@ -1,6 +1,8 @@
 // Owns the disclosure state for the bucket, the vehicle and the switch.
 'use client'
 
+import Link from 'next/link'
+
 import { BucketChips } from '@/components/expenses/bucket-chips'
 import { BudgetImpactSwitch } from '@/components/expenses/budget-impact-switch'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
@@ -98,6 +100,15 @@ export function ImpactControl({
               canAttachVehicle={vehicles.length > 0}
               note={note}
             />
+
+            {vehicles.length === 0 ? (
+              <p className="text-caption text-ink-muted">
+                <Link href="/garage/new" className="text-accent underline underline-offset-2">
+                  Add a vehicle
+                </Link>{' '}
+                and the two car buckets open up. This form closes if you do.
+              </p>
+            ) : null}
 
             {vehicles.length > 0 ? (
               <Field label="Vehicle" htmlFor="expense-vehicle">

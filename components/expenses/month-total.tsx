@@ -2,46 +2,53 @@
 'use client'
 
 import { useExpenseStore } from '@/components/expenses/expense-store'
-import { Money } from '@/components/ui/money'
+import { Total } from '@/components/totals/total'
 import { monthLabel, type IsoDate } from '@/lib/dates'
 import { pendingMonthDelta } from '@/lib/expenses/optimistic'
+import {
+  SPEND_VIEW_DESCRIPTION,
+  SPEND_VIEW_LABEL,
+  totalForView,
+  type MonthViewTotals,
+  type SpendView,
+} from '@/lib/views'
 
 type MonthTotalProps = {
   /** First of the month. */
   month: IsoDate
-  /** Summed by `v_monthly_impact`; amortisation is already applied. */
-  serverTotal: number
+  /** All three figures, computed by `v_month_totals`. */
+  totals: MonthViewTotals
+  /** Which one is on screen. From the URL, falling back to the profile. */
+  view: SpendView
   currency: string
   locale: string
 }
 
 /**
- * The month's budget figure, on the recessed strip from docs/03-DESIGN.md.
+ * The month's figure, on the recessed strip from docs/03-DESIGN.md.
  *
- * The number comes from SQL. The only thing added here is the impact of writes
- * still in flight, computed by the mirror of `v_expense_impact` in
- * `lib/budget.ts` — which is what makes the figure move the instant Save is
- * tapped rather than a round-trip later.
+ * All three numbers come from SQL and all three arrive together, so flipping the
+ * switcher is a re-render rather than a fetch. The only thing added here is the
+ * impact of writes still in flight, computed by the mirror of `v_month_totals`
+ * in `lib/expenses/optimistic.ts` — which is what makes the figure move the
+ * instant Save is tapped rather than a round-trip later.
  *
- * The label is not decoration: a total without its view named is ambiguous, and
- * this one is the budget view, not the all-in one.
+ * The label is not decoration. The same expenses produce three different
+ * figures, and a figure without its view named is a number nobody can act on.
  */
-export function MonthTotal({ month, serverTotal, currency, locale }: MonthTotalProps) {
+export function MonthTotal({ month, totals, view, currency, locale }: MonthTotalProps) {
   const { pending } = useExpenseStore()
-  const total = serverTotal + pendingMonthDelta(pending, month, currency)
+  const total = totalForView(totals, view) + pendingMonthDelta(pending, month, currency, view)
 
   return (
-    <section className="panel-sunken rounded-md px-4 py-5">
-      <p className="text-eyebrow font-display uppercase text-ink-muted">
-        Monthly · {monthLabel(month)}
-      </p>
-      <p className="mt-2">
-        <Money amount={total} currency={currency} locale={locale} size="odometer-lg" />
-      </p>
-      <p className="mt-2 text-caption text-ink-muted">
-        Counts only what is set to affect the budget, spread over the months it was
-        spread across.
-      </p>
-    </section>
+    <Total
+      view={SPEND_VIEW_LABEL[view]}
+      context={monthLabel(month)}
+      emphasis="hero"
+      amount={total}
+      currency={currency}
+      locale={locale}
+      caption={SPEND_VIEW_DESCRIPTION[view]}
+    />
   )
 }
