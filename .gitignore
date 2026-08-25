@@ -16,3 +16,4 @@ next-env.d.ts
 # Test output
 coverage/
 
+.claude/settings.interactive.json
