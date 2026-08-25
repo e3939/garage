@@ -58,14 +58,17 @@
     --text-display-lg: 2rem; /* 32 */
     --text-display: 1.5rem; /* 24 */
     --text-title: 1.125rem; /* 18 */
-    --text-body: 0.9375rem; /* 15 */
+    --text-body: 1rem; /* 16 */
     --text-label: 0.8125rem; /* 13 */
     --text-caption: 0.75rem; /* 12 */
-    --text-eyebrow: 0.6875rem; /* 11 */
-    --text-odometer-lg: 2.5rem; /* 40 */
-    --text-odometer: 1.25rem; /* 20 */
+    --text-eyebrow: 0.75rem; /* 12 */
+    --text-odometer-lg: 2.125rem; /* 34; 40 from 430px up */
+    --text-odometer: 1.125rem; /* 18 */
     /* iOS Safari zooms the whole page when a focused control is under 16px,
-       and it never zooms back out. This is the floor, not a style choice. */
+       and it never zooms back out. This is a platform floor, not a design
+       choice, which is why it stays a separate token even now that it happens
+       to equal --text-body: if the body scale ever drops again, controls must
+       not follow it down. See docs/03-DESIGN.md. */
     --text-input: 1rem; /* 16 */
 
     /* --- Shape. Nothing larger than --r-lg: the paper metaphor has folds. */
@@ -85,8 +88,8 @@
     --space-12: 48px;
 
     /* --- Structure. */
-    --gutter: var(--space-4);
-    --content-max: 720px;
+    --gutter: var(--space-4); /* 16; 24 from 600px up */
+    --content-max: 640px;
     --nav-height: 64px;
     --fab-size: 56px;
     --touch-min: 44px;
@@ -101,6 +104,18 @@
     --duration-arc: 600ms;
     --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
     --ease-exit: ease-out;
+  }
+
+  @media (min-width: 430px) {
+    :root {
+      --text-odometer-lg: 2.5rem; /* 40 */
+    }
+  }
+
+  @media (min-width: 600px) {
+    :root {
+      --gutter: var(--space-6); /* 24 */
+    }
   }
 
   @media (min-width: 768px) {

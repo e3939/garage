@@ -82,16 +82,46 @@ Scale (mobile → desktop where they differ):
 display-lg   32/34  Archivo Expanded 700, tracking -0.02em     Vehicle nickname
 display      24/26  Archivo Expanded 600, tracking -0.01em     Screen titles
 title        18     Inter Tight 600                            Card headings
-body         15     Inter Tight 400, line-height 1.5           Default
+body         16     Inter Tight 400, line-height 1.5           Default
+input        16     Inter Tight 400                            Form controls; a floor, see below
 label        13     Inter Tight 500                            Field labels
 caption      12     Inter Tight 400, --text-muted              Meta
-eyebrow      11     Archivo Expanded 600, tracking 0.12em, caps Section markers
-odometer-lg  40     JetBrains Mono 700, tabular                 Hero figures
-odometer     20     JetBrains Mono 500, tabular                 Row amounts
+eyebrow      12     Archivo Expanded 600, tracking 0.12em, caps Section markers
+odometer-lg  34/40  JetBrains Mono 700, tabular                 Hero figures
+odometer     18     JetBrains Mono 500, tabular                 Row amounts
 ```
+
+`odometer-lg` is 34 below 430px and 40 from 430px up, and it is the only step in the scale
+that changes below the tablet breakpoint. The reason is that dong amounts are long. The hero
+panel is 326px wide inside its padding on a 390pt screen; at 40 it holds thirteen characters
+(`100.000.000 ₫`) with 17px to spare and overflows at fourteen, so a total that reaches a
+billion breaks the panel. At 34 the same panel holds fifteen (`1.000.000.000 ₫`) with 23px
+spare. Two characters of range, bought for six points of size on the one screen size where it
+is tight.
 
 Rule: a screen has at most one `display-lg` and one `odometer-lg`. If a design needs two hero
 numbers, one of them isn't a hero.
+
+### Form controls have a hard 16px minimum
+
+**Never set a font size below 16px on an `input`, `select` or `textarea`.** This is not a
+taste question and it is not negotiable by a design decision.
+
+iOS Safari zooms the whole page in when a control smaller than 16px takes focus, and it does
+not zoom back out when the control is blurred. The user is left on a page that is
+permanently magnified and scrolls sideways, and nothing in the app looks broken enough to
+explain why. One search field at 15px is enough to do it to every screen.
+
+`--text-input` exists as a separate token for this reason, even though it currently holds the
+same value as `--text-body`. It is a platform floor, not a step in the type scale: if the body
+size is ever revised downward, controls must not follow it down. `INPUT_CLASS` in
+`components/ui/field.tsx` carries it, and a base-layer rule on `input, select, textarea`
+catches anything that forgets — a utility can still set a *larger* size, which is how the
+quick-add amount field renders at 40.
+
+The two non-fixes to avoid: `maximum-scale=1` and `user-scalable=no` in the viewport meta.
+iOS Safari has ignored both since iOS 10, and they disable pinch-zoom on the browsers that do
+still honour them, which is an accessibility regression in exchange for nothing.
 
 ---
 
@@ -103,8 +133,13 @@ numbers, one of them isn't a hero.
 - Elevation is mostly **rules and tint**, not shadow. One shadow token exists,
   `--shadow-sheet: 0 -8px 32px rgba(42,38,32,0.12)`, used only on bottom sheets and modals.
 - Recessed panels (the odometer bed) use `--paper-sink` plus `inset 0 1px 0 var(--rule)`.
-- Grid: single column on mobile, 16px gutters. Content max-width 720px on desktop; the app
-  stays a column even on a large screen. It is a logbook, not a control room.
+- Grid: single column on mobile. Gutter is 16px below 600px and 24px from 600px up — the
+  gutter stays tight on a phone on purpose, because horizontal space is the scarce axis there
+  and a wider gutter buys air by truncating content.
+- Content max-width 640px; the app stays a column even on a large screen. It is a logbook,
+  not a control room. 640 rather than 720 because 16px body across 720 runs to roughly 95
+  characters a line, well past a comfortable measure.
+- Ledger rows are 64px, day headings 32px. Fixed, so the list virtualises without measuring.
 
 ---
 

@@ -9,8 +9,8 @@ import type { OptimisticRow } from '@/lib/expenses/optimistic'
  * so the ledger reads as a ruled grid rather than a stack of cards. Text
  * truncates; it never wraps.
  */
-export const LEDGER_ROW_HEIGHT = 72
-export const LEDGER_DAY_HEIGHT = 36
+export const LEDGER_ROW_HEIGHT = 64
+export const LEDGER_DAY_HEIGHT = 32
 
 type LedgerRowButtonProps = {
   row: OptimisticRow
