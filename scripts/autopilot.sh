@@ -15,10 +15,19 @@ cd "$(dirname "$0")/.."
 
 # ---- configuration ---------------------------------------------------------
 
+# Phases already merged to main are commented out. Uncomment to re-run one.
 PHASES=(
-  "00-foundation"
-  "01-schema-money"
-  "02-expenses"
+  # "00-foundation"
+  # "01-schema-money"
+  # "02-expenses"
+  "03-fixes"
+  "04-vehicles"
+  "05-timeline"
+  "06-mod-planner"
+  "07-car-records"
+  "08-money-tools"
+  "09-polish"
+  "10-import-export"
 )
 
 PHASE_TIMEOUT_MIN=90     # kill a phase that runs longer than this
@@ -142,6 +151,7 @@ for phase in "${PHASES[@]}"; do
   BRANCH="feat/${phase}"
   git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
   log "On branch $BRANCH"
+  log "HEAD: $(git rev-parse --short HEAD)"
 
   PHASE_LOG="$LOG_DIR/${phase}.log"
 
