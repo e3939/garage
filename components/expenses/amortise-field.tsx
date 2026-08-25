@@ -1,12 +1,16 @@
 // Form state.
 'use client'
 
-import { Chip } from '@/components/ui/chip'
+import { Field, INPUT_CLASS } from '@/components/ui/field'
 import { addMonthsToMonthStart, monthLabel, type IsoDate } from '@/lib/dates'
 import { formatMoney, splitMinor } from '@/lib/money'
 
-/** The spans people actually use. Anything else is typed. */
-const PRESETS = [3, 6, 12, 24] as const
+/**
+ * The spans a cost actually gets spread over. One control, not a number field
+ * and a row of chips doing the same job: on a phone the list is one tap and the
+ * platform picker, and nothing in it needs typing.
+ */
+const CHOICES = [1, 2, 3, 6, 9, 12, 18, 24, 36, 48, 60] as const
 
 type AmortiseFieldProps = {
   months: number
@@ -20,8 +24,20 @@ type AmortiseFieldProps = {
   suggested?: boolean
 }
 
+function monthChoices(months: number): number[] {
+  const choices: number[] = [...CHOICES]
+  // An expense stored with a span the list does not offer — anything up to the
+  // schema's 120 — keeps its own value rather than being quietly rounded to a
+  // neighbour the moment its form opens.
+  if (!choices.includes(months)) {
+    choices.push(months)
+    choices.sort((a, b) => a - b)
+  }
+  return choices
+}
+
 /**
- * "Spread this over ___ months."
+ * "Spread over ___."
  *
  * Never preselected: the field arrives at one month and stays there until
  * someone chooses otherwise (docs/01-PRODUCT.md). The line underneath states
@@ -43,6 +59,14 @@ export function AmortiseField({
   const rest = slices?.[1]
   const lastMonth = addMonthsToMonthStart(occurredOn, months - 1)
 
+  const hint = !spread
+    ? 'The whole amount lands in the month it happened.'
+    : first === undefined || rest === undefined
+      ? `Split across ${months} months, ending ${monthLabel(lastMonth)}.`
+      : first === rest
+        ? `${formatMoney(first, currency, { locale })} a month until ${monthLabel(lastMonth)}.`
+        : `${formatMoney(first, currency, { locale })} in the first month, then ${formatMoney(rest, currency, { locale })} until ${monthLabel(lastMonth)}.`
+
   return (
     <div className="space-y-2">
       {suggested ? (
@@ -52,47 +76,20 @@ export function AmortiseField({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-label text-ink-muted">Spread this over</span>
-        <label className="sr-only" htmlFor="amortize-months">
-          Months to spread over
-        </label>
-        <input
+      <Field label="Spread over" htmlFor="amortize-months" hint={hint}>
+        <select
           id="amortize-months"
-          type="number"
-          inputMode="numeric"
-          min={1}
-          max={120}
+          className={INPUT_CLASS}
           value={months}
-          onChange={(event) => {
-            const next = Number(event.target.value)
-            onChange(Number.isFinite(next) ? Math.min(120, Math.max(1, Math.trunc(next))) : 1)
-          }}
-          className="min-h-touch w-20 rounded-md border border-border-strong bg-surface px-3 text-center font-mono text-input text-ink outline-none"
-        />
-        <span className="text-label text-ink-muted">months</span>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {PRESETS.map((preset) => (
-          <Chip key={preset} selected={months === preset} onSelect={() => onChange(preset)}>
-            {preset}
-          </Chip>
-        ))}
-        <Chip selected={months === 1} onSelect={() => onChange(1)}>
-          Do not spread
-        </Chip>
-      </div>
-
-      <p className="text-caption text-ink-muted">
-        {!spread
-          ? 'The whole amount lands in the month it happened.'
-          : first === undefined || rest === undefined
-            ? `Split across ${months} months, ending ${monthLabel(lastMonth)}.`
-            : first === rest
-              ? `${formatMoney(first, currency, { locale })} a month until ${monthLabel(lastMonth)}.`
-              : `${formatMoney(first, currency, { locale })} in the first month, then ${formatMoney(rest, currency, { locale })} until ${monthLabel(lastMonth)}.`}
-      </p>
+          onChange={(event) => onChange(Number(event.target.value))}
+        >
+          {monthChoices(months).map((choice) => (
+            <option key={choice} value={choice}>
+              {choice === 1 ? 'Do not spread' : `${choice} months`}
+            </option>
+          ))}
+        </select>
+      </Field>
     </div>
   )
 }

@@ -32,6 +32,7 @@ export {
   LinkBreak, // Blocked dependency
   WarningCircle, // Due soon
   Plus, // Add
+  NoteBlank, // A note is attached — ledger row signal, docs/03-DESIGN.md
 
   // --- Shell chrome. Navigation and account, nothing feature-specific.
   House, // Today

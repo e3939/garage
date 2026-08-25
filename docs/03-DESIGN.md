@@ -233,6 +233,38 @@ is the only playful thing in the ledger; the rows themselves stay strictly align
   destructive or ambiguous write.
 - **Touch targets** minimum 44×44. Primary actions in the bottom third of the screen.
 
+### The ledger detail line
+
+A ledger row is two lines in a fixed 64px slot: a title, and under it a detail line set in
+`caption`. **The detail line carries structured fields only — bucket, category, vehicle, in
+that order — and never free text.** No note, no caption, no merchant blurb, no count.
+
+The reason is that the line truncates rather than wraps, so everything on it competes for the
+same handful of characters, and free text always wins that competition by being longer. Put a
+note on the line and the note is not what gets cut — the row's own fields are, because they
+sit in front of it. Measured on a 390pt viewport with a real dong amount in the right-hand
+column, the line has between 82px and 182px to work with, which is roughly thirteen to thirty
+characters of Inter Tight at 12px. A one-clause note fills all of it.
+
+Signals that something *exists* but does not fit are carried by a glyph at the end of the
+line, not by words:
+
+| Signal | Glyph | Meaning |
+|---|---|---|
+| The expense has a note | `NoteBlank` | There is a note. Not how long, not what it says. |
+| The expense has attachments | `Camera` | There is at least one photo. Not how many. |
+
+Regular weight, 20px (`ICON_UI`), `--text-faint`, always at the end of the line, always in
+that order, one glyph per signal no matter how many notes or photos there are. Each carries
+screen-reader-only text, because a glyph on its own is not a label. The full note, the whole
+set of photos and the count all live in the detail sheet, which is one tap away and has room.
+
+The same rule holds anywhere a fixed-height row summarises a record — the timeline feed, the
+service history, the parts list. Structured fields on the line, free text behind the tap.
+
+`npm run measure:ledger` shapes both lines against the built font subsets and reports what
+fits at 390pt, so this is a question with an answer rather than an opinion.
+
 ## Quality floor
 
 Keyboard focus visible everywhere (`2px solid var(--fire-green)`, `outline-offset: 2px`).

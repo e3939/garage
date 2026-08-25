@@ -54,10 +54,38 @@ Measured on a mid-range Android over simulated 4G, production build.
 - First Contentful Paint under 1.2s
 - Largest Contentful Paint under 1.8s
 - Interaction to Next Paint under 150ms
-- Route JS payload under 120KB gzipped per route
+- Route JS: **shared baseline + 40KB gzipped of route-specific JavaScript**
 - Every write feels instant: optimistic UI first, server reconciles after
 - Lists over 40 rows are virtualised
 - No layout shift when images load — always reserve aspect ratio
+
+### The baseline, and why the budget is split
+
+The framework runtime is not route weight and cannot be spent differently by writing better
+application code. React 19 plus the Next 16 App Router client, the router, the Server Actions
+transport and the authenticated shell arrive on every route in the same chunks and are cached
+across navigations. On 25 August 2026 that shared baseline measured **139.4KB gzipped across
+eight chunks** — `/settings` renders almost nothing of its own and pays exactly that.
+
+So a single per-route ceiling was measuring the framework, not the app. It was set at 120KB,
+every route has been over it since Phase 0, and no change to this codebase could have brought
+a route under it. A budget nothing can pass is not a budget; it is a line item everybody
+learns to ignore.
+
+The two figures are now tracked separately:
+
+- **A route's own JavaScript stays under 40KB gzipped.** This is the number that responds to
+  the code that gets written — components, forms, chart libraries, a stray client-side
+  dependency. Today the widest route is `/ledger` at 30.6KB, then `/today` at 29.6KB.
+- **The shared baseline is watched, not budgeted.** It moves when the framework moves or when
+  something is added to the shell. Record it here when it changes and say why it changed. A
+  jump of more than about 10KB that is not a framework upgrade means something landed in the
+  shell that belongs on a route.
+
+`npm run build && npm run measure:bundles` prints both. It signs in against the local stack,
+fetches every route from the production server and gzips the exact `<script src>` set each one
+asks for, minus the `nomodule` polyfill bundle no modern browser fetches. That is what a phone
+pays, so that is what gets counted.
 
 Rules that keep this true:
 - Default to Server Components. `"use client"` requires a reason in a comment above it.

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { categoryIconMap } from '@/components/expenses/category-icons'
 import { MonthTotal } from '@/components/expenses/month-total'
 import { LedgerList } from '@/components/ledger/ledger-list'
+import { ledgerSignalIcons } from '@/components/ledger/row-signals'
 import { monthStart, todayIso } from '@/lib/dates'
 import { EMPTY_FILTERS } from '@/lib/expenses/filters'
 import { fetchRankedCategories } from '@/lib/queries/categories'
@@ -54,6 +55,7 @@ export default async function TodayPage() {
               filters={EMPTY_FILTERS}
               categories={categories}
               icons={categoryIconMap(categories)}
+              signals={ledgerSignalIcons()}
               vehicles={vehicles}
               currency={preferences.baseCurrency}
               locale={preferences.locale}

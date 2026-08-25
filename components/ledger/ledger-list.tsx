@@ -12,6 +12,7 @@ import {
 import { ExpenseForm } from '@/components/expenses/expense-form'
 import { useExpenseStore } from '@/components/expenses/expense-store'
 import { LedgerDayHeading, LedgerRowButton, LEDGER_DAY_HEIGHT, LEDGER_ROW_HEIGHT } from '@/components/ledger/ledger-row'
+import type { LedgerSignalIcons } from '@/components/ledger/row-signals'
 import { Button } from '@/components/ui/button'
 import { Sheet } from '@/components/ui/sheet'
 import { VirtualList } from '@/components/ui/virtual-list'
@@ -37,6 +38,8 @@ type LedgerListProps = {
   filters: LedgerFilters
   categories: readonly CategoryOption[]
   icons: Record<string, ReactNode>
+  /** The note and attachment glyphs, drawn on the server like the icons above. */
+  signals: LedgerSignalIcons
   vehicles: readonly VehicleOption[]
   currency: string
   locale: string
@@ -61,6 +64,7 @@ export function LedgerList({
   filters,
   categories,
   icons,
+  signals,
   vehicles,
   currency,
   locale,
@@ -139,6 +143,7 @@ export function LedgerList({
                 row={item.row}
                 locale={locale}
                 icon={item.row.category_icon ? icons[item.row.category_icon] : null}
+                signals={signals}
                 onOpen={() => setEditing(item.row)}
               />
             )

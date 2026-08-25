@@ -16,6 +16,8 @@
     "db:diff": "supabase db diff",
     "db:logs": "supabase logs db",
     "icons": "node scripts/generate-icons.mjs",
+    "measure:bundles": "node scripts/measure-bundles.mjs",
+    "measure:ledger": "node scripts/measure-ledger-truncation.mjs",
     "fonts": "node scripts/subset-mono.mjs"
   },
   "devDependencies": {

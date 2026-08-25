@@ -571,3 +571,220 @@ session, including calling the Server Actions directly by their action ids:
    Load older, and confirm the day subtotal reads the same above and below the join.
 6. **Rename a system category and archive a custom one**, then check the quick-add chips and
    the ledger rows follow.
+
+
+---
+
+## Phase 3 — Three fixes from real use on a phone
+
+Branch: `feat/03-fixes`. No roadmap phase; three things reported from using the deployed app
+on an iPhone, fixed before Phase 3 (vehicles) starts.
+
+### What was built
+
+- **The expense form's More section collapses to one sentence.** Bucket and budget impact are
+  now reported rather than asked: a single line — "Kept out of August · Project · Civic" —
+  with a **Change** affordance that opens the same three controls that were always there
+  (bucket chips, vehicle, the switch). An expense that carries an override opens with More
+  down and those controls already expanded, so the override path loses nothing.
+- **The vehicle dependency is stated where it happens.** The vehicle dropdown moved inside
+  that block, next to the chips it is coupled to, and a line under the chips says what the
+  coupling does: "No vehicle in the garage yet. Car buckets need one, so this stays life
+  spend whatever the category says", or "Attached to Civic. Choosing Life removes it", or
+  "Choosing a car bucket attaches Civic". Car chips with an empty garage are properly
+  disabled rather than faint. With exactly one vehicle in the garage, choosing a car category
+  attaches it instead of silently falling back to Life.
+- **Chips have three legible states.** Selected is a wash of the chip's own colour plus a
+  doubled ring and a filled dot — not the solid brick fill that made a current state shout as
+  loudly as the Save button. Unselected is a hairline outline with a hollow dot. Disabled is
+  sunken paper with a dashed outline, faint ink and a screen-reader "unavailable". The
+  amortisation field is now one control, a native select from "Do not spread" to 60 months,
+  in place of a number input and four chips doing the same job.
+- **Ledger rows carry structured fields only.** The detail line is bucket · category ·
+  vehicle. The note and the attachment count are gone from it; a `NoteBlank` and a `Camera`
+  glyph at the end of the line mark that each exists. Both are drawn on the server and handed
+  down as elements, so the ledger's client bundle still holds no Phosphor. The full note is
+  in the detail sheet, as before.
+- **The performance budget is a number something can pass.** Re-expressed in CLAUDE.md §3 as
+  a shared baseline plus 40KB gzipped per route, with the baseline measured and recorded, and
+  `npm run measure:bundles` committed so the figure is reproducible rather than remembered.
+
+### Proof it works
+
+`npm test` — 138 tests, unchanged. `npm run typecheck`, `npm run lint` (0 errors, the one
+pre-existing react-hook-form compiler warning), `npm run build` all clean. No migration, so
+no `db reset` was needed.
+
+**Bundles**, `npm run measure:bundles` against the production build, this branch versus its
+parent commit measured the same way in a temporary worktree:
+
+| Route | Own JS before | Own JS after |
+|---|---|---|
+| `/ledger` | 29.8KB | 30.6KB |
+| `/today` | 28.8KB | 29.6KB |
+| `/garage`, `/money` | 25.6KB | 26.4KB |
+| `/settings/categories` | 11.8KB | 11.9KB |
+| `/settings` | 0.0KB | 0.0KB |
+
+Shared baseline 139.4KB gzipped across eight chunks, unchanged. The phase costs about 0.8KB
+gzipped on every route that carries the expense form, which is every route with the FAB.
+
+**Ledger truncation**, `npm run measure:ledger`, eight representative rows shaped against the
+built font subsets at a 390pt viewport:
+
+| | Rows where a line clips |
+|---|---|
+| Before | 4 of 8 |
+| After | 3 of 8 |
+
+The three that still clip are worth reading precisely, because the headline number
+undersells the change:
+
+- **Petrolimex Nguyễn Văn Cừ** — the *title* clips at 184px in 182px. The detail line now
+  fits (141px in 154px) where it did not before (209px in 182px). This phase does not touch
+  titles.
+- **Garage Đức Anh** — detail 151px in 93px, where before it was 303px in 149px. The row has
+  a wide amount (1.240.000 ₫), a note and a photo, so the glyphs and the amount together
+  leave the line 93px. It still clips, but it clips having lost a third of a field rather
+  than two whole fields.
+- **Bảo hiểm PVI** — detail 134px in 121px, before 180px in 149px.
+
+So the note stopped being what pushes the row's own fields off the line; on the widest
+amounts the fields still do not all fit next to a seven-figure dong total.
+
+**Rendering** was checked against the production server with a real session: three expenses
+inserted for a fresh user, `/ledger` fetched, and the row markup confirmed to hold
+`Life · Groceries`, one note glyph, one photo glyph, and no note text in the visible row. The
+three new client components were also rendered through `react-dom/server` in a scratch test
+(collapsed, expanded with a vehicle, expanded with an empty garage, and the amortisation
+select) and the markup checked by hand; the scratch test was deleted rather than committed,
+since it duplicates nothing the suite is meant to hold (CLAUDE.md §7).
+
+### Assumptions
+
+1. **The judgement call went to the collapsed one-liner.** The category implies both bucket
+   and budget impact and is right nearly every time, so three controls on every open were
+   asking a question already answered. The override path is unchanged in reach: the same
+   chips, the same vehicle select, the same switch, one tap further in — and zero taps
+   further in on an expense that already carries an override, because those open expanded.
+2. **The summary line reads impact first, then bucket, then vehicle** — "Kept out of August ·
+   Project · Civic" — following the phrasing in the phase brief. The bucket word carries its
+   bucket colour; the vehicle is muted.
+3. **The vehicle dropdown moved inside the bucket block rather than staying a sibling.**
+   Bucket and vehicle are one decision, and the whole complaint was that the explanation sat
+   three fields from the thing it explained. The consequence is that attaching a vehicle is
+   now two taps (More, then Change) rather than one, on a form where it was already behind
+   More.
+4. **Choosing a car category attaches the vehicle when there is exactly one.** Picking "Fuel"
+   with one car in the garage means that car; falling back to Life there was the reported bug
+   wearing a different hat. With two or more the form does not guess, and the line under the
+   chips says what to do. An automatic attachment is remembered as automatic and is taken
+   back off when the category moves to a life-default one; a vehicle chosen by hand is never
+   touched.
+5. **The amortisation control is a native select, not a segmented chip row.** One control was
+   the requirement. A select also gets the platform picker on iOS, clears the 16px control
+   floor, and holds eleven spans without wrapping. The offered spans are 1, 2, 3, 6, 9, 12,
+   18, 24, 36, 48, 60; an expense stored with a span outside that list — the schema allows up
+   to 120 — keeps its own value as an extra option rather than being rounded on open.
+6. **Selected chips are a tint plus a ring, not a fill.** `color-mix(in srgb, <colour> 14%,
+   var(--surface))` with a 1px inset ring in the same colour, so the state reads without
+   layout shift and without competing with the primary button. The dot is what makes the
+   state survive colour blindness and glare: hollow, filled, or grey and dashed.
+7. **Disabled chips use a real `disabled` attribute.** They are not focusable and give no
+   feedback on tap, which is the trade for having them announced as unavailable; the
+   explanation is visible text under the chips rather than a `title` a phone never shows.
+8. **The ledger keeps the category out of the detail line when it is already the title.** The
+   line is bucket · category · vehicle as specified, but a row with no merchant is titled by
+   its category, and repeating it two lines running would spend the scarce width saying the
+   same word twice.
+9. **One glyph per signal, whatever the count.** Two photos and five photos both show one
+   `Camera`. The count is in the detail sheet. `NoteBlank` comes first, then `Camera`.
+10. **The attachment glyph is `Camera`, from the canonical mapping table.** Attachments in
+    this app are photographs of receipts and parts, and the table already maps Photo to
+    `Camera`. `NoteBlank` is new and is documented in the new "The ledger detail line"
+    section rather than in the canonical table — see the docs note below.
+11. **The bundle figures are measured from rendered HTML, not from a manifest.** The script
+    sums the gzipped `<script src>` set of each route from the production server with a real
+    session, minus the `noModule` polyfill bundle. Chunks common to every measured route are
+    the baseline; everything else is the route's own.
+12. **The eight rows in `measure-ledger-truncation.mjs` are a fixture.** The real ledger is in
+    the production database, which this run cannot read, and the local stack holds only rows
+    left by the database tests. The fixture is eight realistic shapes — long Vietnamese
+    merchant names, a mod with a note and two photos, short cash rows — and the before and
+    after numbers come from the same eight, so the comparison is like for like even if the
+    absolute count is not your ledger's.
+
+### Docs
+
+- **`docs/03-DESIGN.md`** gained "The ledger detail line" under Component notes, as the phase
+  pre-approved: the rule that the line carries structured fields only, why (the line
+  truncates, free text always wins the width fight, and it is the row's own fields that get
+  cut), the two signal glyphs with their meanings, and the measurement command.
+- **`CLAUDE.md` §3** was rewritten around the baseline split, as the phase pre-approved,
+  including the measured baseline, the 40KB per-route ceiling, today's figures, and how to
+  reproduce them.
+- **`NoteBlank` was not added to the canonical icon table**, although that table says adding
+  an icon means adding a row to it first. The pre-approved edit was the detail-line rule, and
+  that is where the glyph is documented instead. If you want the table to stay the single
+  index of every icon in the app, the row to add is `| Note attached | NoteBlank |`. That is
+  a one-line doc edit and it is deliberately left to you.
+
+### Not built, and why
+
+- **A way to create a vehicle from the expense form.** The phase allows either that or a
+  clear line explaining the fallback "until Phase 3 ships vehicle creation". Vehicle CRUD is
+  Phase 3 and does not exist yet, so the line is what shipped. When Phase 3 lands, the
+  natural home for an "Add a vehicle" button is the empty-garage branch of the note in
+  `components/expenses/impact-control.tsx`.
+- **Anything about the title line of a ledger row.** One of the three rows that still clips
+  clips on its title, not its detail line. Shortening or wrapping titles was not in the
+  phase and would change the row height, which the virtual list depends on.
+- **A fix for the two detail lines that still clip.** Both are squeezed by a seven-figure
+  amount in the right-hand column rather than by anything on the left. The honest options are
+  abbreviating the amount, dropping a field from the line, or dropping the bucket word in
+  favour of the colour alone — and the last one breaks "colour never carries meaning alone".
+  All three are design decisions rather than bug fixes, so they are noted here instead.
+
+### Where confidence is low
+
+- **Nothing was driven through a real browser, again.** The disclosure states, the collapse
+  and expand, the select picker on iOS and the chip states under real light were all reasoned
+  about and rendered server-side, not tapped. The one thing most worth a human's eye is
+  whether the collapsed summary line reads as *information* rather than as a disabled
+  control — it is a button with a "Change" affordance and no border of its own.
+- **`<details>` is now controlled.** More has an `open` prop and an `onToggle` handler so that
+  "Attach one" under the category chips can open it. Native details toggling still drives the
+  state, but a browser that fires `toggle` differently would make it feel sticky.
+- **Auto-attaching the only vehicle is a behaviour change, not just a presentation one.** It
+  is assumption 4 and it is the one thing in this phase that changes what gets written to the
+  database for the same taps. It only fires when the bucket has not been overridden and the
+  garage holds exactly one vehicle, and the summary line always shows the result before Save.
+- **The truncation figures depend on the fixture.** The method is sound — the same font
+  subsets the browser downloads, shaped by HarfBuzz, against widths read off the layout — but
+  "3 of 8" is 3 of *those* 8. Point it at your own rows once Phase 9 gives you an export.
+- **`color-mix` in the chip tint** needs iOS 16.2 or newer. Everything else in the app already
+  assumes a browser of that vintage, and a browser without it renders the chip untinted with
+  its ring and dot intact, which still distinguishes the state.
+
+### Migration
+
+**None.** This phase adds no migration and needs no `supabase db push`. The schema is
+untouched.
+
+### What a reviewer should check first
+
+1. **Open quick add on the phone and tap More.** The section should read as one sentence with
+   a Change affordance, then the spread control, then the filing details. If the sentence
+   does not immediately say what the expense will do to the month, the whole judgement call
+   was wrong and the controls should come back.
+2. **With an empty garage, pick "Mods & Parts".** The caption under the category chips should
+   say it logs as life spend, and inside Change the two car chips should be visibly
+   unavailable — dashed, sunken — with the reason under them.
+3. **Once you have a vehicle (Phase 3), pick a fuel or maintenance category** and check the
+   summary line attaches the car by itself, and that switching to a life category lets it go.
+4. **Scroll the ledger.** Rows should read bucket · category · vehicle with the note and photo
+   glyphs at the end of the line, and the rows with long merchant names should be the only
+   ones cutting off.
+5. **CLAUDE.md §3.** The budget is the part of this phase with the longest half-life. Check
+   that 40KB per route is a ceiling you would actually enforce, and re-run
+   `npm run build && npm run measure:bundles` to confirm the numbers on your machine.

@@ -11,9 +11,8 @@ import {
   type ActionResult,
 } from '@/app/(app)/expenses/actions'
 import { AmortiseField } from '@/components/expenses/amortise-field'
-import { BucketChips } from '@/components/expenses/bucket-chips'
-import { BudgetImpactSwitch } from '@/components/expenses/budget-impact-switch'
 import { CategoryChips } from '@/components/expenses/category-chips'
+import { ImpactControl } from '@/components/expenses/impact-control'
 import { useExpenseStore } from '@/components/expenses/expense-store'
 import { Button } from '@/components/ui/button'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
@@ -117,10 +116,25 @@ export function ExpenseForm({
     defaultValues: defaults(initial, categories, today, locale),
   })
 
+  // An expense that carries an override is one where the category's own answer
+  // was not the right one, so its form opens with More down and the controls
+  // already expanded: on that expense the one-line summary is not the whole
+  // story. Everything else starts collapsed.
+  const overridden = useMemo(() => {
+    const start = defaults(initial, categories, today, locale)
+    return start.bucketOverride !== '' || start.countsOverride !== ''
+  }, [initial, categories, today, locale])
+
+  const [moreOpen, setMoreOpen] = useState(overridden)
+  const [impactOpen, setImpactOpen] = useState(overridden)
+
   const values = watch()
 
   const amountRef = useRef<HTMLInputElement | null>(null)
   const amountField = register('amountText')
+
+  /** True while the attached vehicle is the form's doing rather than the user's. */
+  const autoVehicle = useRef(false)
 
   // The sheet opens with the amount field focused and a numeric keypad up. The
   // frame of delay lets <dialog>.showModal() finish claiming focus first.
@@ -168,12 +182,47 @@ export function ExpenseForm({
     amortiseThreshold !== null && amount !== null && Math.abs(amount) > amortiseThreshold
 
   function chooseBucket(next: ExpenseBucket) {
+    autoVehicle.current = false
     setValue('bucketOverride', next)
     if (next === 'life') {
       setValue('vehicleId', '')
       setValue('odometerKm', '')
     } else if (!values.vehicleId && vehicles[0]) {
       setValue('vehicleId', vehicles[0].id)
+    }
+  }
+
+  function chooseVehicle(next: string) {
+    autoVehicle.current = false
+    setValue('vehicleId', next)
+    setValue('bucketOverride', '')
+    if (next === '') setValue('odometerKm', '')
+  }
+
+  /**
+   * A category whose default bucket is a car bucket is asking for the car, and
+   * with one vehicle in the garage there is no ambiguity about which one — so it
+   * gets attached rather than the bucket silently falling back to life. With two
+   * vehicles the form does not guess; the note under the chips says what to do.
+   *
+   * The attachment is remembered as automatic, so moving on to a life category
+   * takes it back off again. A vehicle the user picked by hand is never touched.
+   */
+  function chooseCategory(id: string) {
+    setValue('categoryId', id)
+
+    if (values.bucketOverride !== '') return
+    const next = categories.find((entry) => entry.id === id) ?? null
+    if (!next) return
+
+    const only = vehicles.length === 1 ? vehicles[0] : undefined
+    if (next.default_bucket !== 'life' && values.vehicleId === '' && only) {
+      autoVehicle.current = true
+      setValue('vehicleId', only.id)
+    } else if (next.default_bucket === 'life' && autoVehicle.current) {
+      autoVehicle.current = false
+      setValue('vehicleId', '')
+      setValue('odometerKm', '')
     }
   }
 
@@ -261,11 +310,29 @@ export function ExpenseForm({
             categories={categories}
             icons={icons}
             value={values.categoryId}
-            onChange={(id) => setValue('categoryId', id)}
+            onChange={chooseCategory}
           />
           {forcedToLife ? (
             <p className="text-caption text-ink-muted">
-              No vehicle attached, so this is life spend.
+              {vehicles.length === 0
+                ? 'No vehicle in the garage yet, so this logs as life spend.'
+                : 'No vehicle attached, so this logs as life spend.'}
+              {vehicles.length > 0 ? (
+                <>
+                  {' '}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMoreOpen(true)
+                      setImpactOpen(true)
+                    }}
+                    className="text-accent underline underline-offset-2"
+                  >
+                    Attach one
+                  </button>
+                  .
+                </>
+              ) : null}
             </p>
           ) : null}
         </div>
@@ -284,12 +351,44 @@ export function ExpenseForm({
           </div>
         ) : null}
 
-        <details className="rounded-md border border-border">
+        <details
+          className="rounded-md border border-border"
+          open={moreOpen}
+          onToggle={(event) => setMoreOpen(event.currentTarget.open)}
+        >
           <summary className="min-h-touch cursor-pointer list-none px-3 py-3 text-label text-ink-muted marker:content-none">
             More
           </summary>
 
+          {/* Order is what this expense means first and what it was second:
+              bucket and budget impact decide which pile of money it came out of
+              and whether August is judged on it. The date and the merchant are
+              filing details. */}
           <div className="space-y-5 border-t border-border px-3 py-4">
+            <ImpactControl
+              bucket={bucket}
+              countsTowardBudget={countsTowardBudget}
+              occurredOn={occurredOn}
+              vehicles={vehicles}
+              vehicleId={values.vehicleId}
+              onBucket={chooseBucket}
+              onVehicle={chooseVehicle}
+              onCounts={(next) => setValue('countsOverride', next ? 'yes' : 'no')}
+              open={impactOpen}
+              onOpenChange={setImpactOpen}
+            />
+
+            {suggestSpread ? null : (
+              <AmortiseField
+                months={values.amortizeMonths}
+                onChange={(months) => setValue('amortizeMonths', months)}
+                amount={amount}
+                currency={currency}
+                locale={locale}
+                occurredOn={occurredOn}
+              />
+            )}
+
             <Field label="Date" htmlFor="expense-date">
               <input
                 id="expense-date"
@@ -298,68 +397,6 @@ export function ExpenseForm({
                 {...register('occurredOn')}
               />
             </Field>
-
-            <Field
-              label="Vehicle"
-              htmlFor="expense-vehicle"
-              hint={
-                vehicles.length === 0
-                  ? 'No vehicles yet. Car buckets need one.'
-                  : 'Attaching a vehicle moves this into a car bucket.'
-              }
-            >
-              <select
-                id="expense-vehicle"
-                className={INPUT_CLASS}
-                value={values.vehicleId}
-                onChange={(event) => {
-                  const next = event.target.value
-                  setValue('vehicleId', next)
-                  setValue('bucketOverride', '')
-                  if (next === '') setValue('odometerKm', '')
-                }}
-              >
-                <option value="">No vehicle</option>
-                {vehicles.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.nickname}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <div className="space-y-2">
-              <p className="text-label text-ink-muted">Bucket</p>
-              <BucketChips
-                value={bucket}
-                onChange={chooseBucket}
-                vehicleAttached={vehicle !== null}
-                canAttachVehicle={vehicles.length > 0}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-label text-ink-muted">Budget impact</p>
-              <BudgetImpactSwitch
-                checked={countsTowardBudget}
-                occurredOn={occurredOn}
-                onChange={(next) => setValue('countsOverride', next ? 'yes' : 'no')}
-              />
-            </div>
-
-            {suggestSpread ? null : (
-              <div className="space-y-2">
-                <p className="text-label text-ink-muted">Spread over months</p>
-                <AmortiseField
-                  months={values.amortizeMonths}
-                  onChange={(months) => setValue('amortizeMonths', months)}
-                  amount={amount}
-                  currency={currency}
-                  locale={locale}
-                  occurredOn={occurredOn}
-                />
-              </div>
-            )}
 
             <Field label="Merchant" htmlFor="expense-merchant">
               <input
