@@ -344,6 +344,13 @@ export type Database = {
             foreignKeyName: "expenses_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "expenses_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
@@ -412,6 +419,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_expense_impact"
             referencedColumns: ["expense_id"]
+          },
+          {
+            foreignKeyName: "fuel_logs_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
           },
           {
             foreignKeyName: "fuel_logs_vehicle_id_fkey"
@@ -515,6 +529,13 @@ export type Database = {
             foreignKeyName: "funds_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "funds_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
@@ -558,6 +579,13 @@ export type Database = {
           vehicle_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "milestones_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
           {
             foreignKeyName: "milestones_vehicle_id_fkey"
             columns: ["vehicle_id"]
@@ -666,6 +694,13 @@ export type Database = {
             foreignKeyName: "mod_plans_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "mod_plans_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
@@ -761,6 +796,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_expense_impact"
             referencedColumns: ["expense_id"]
+          },
+          {
+            foreignKeyName: "parts_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
           },
           {
             foreignKeyName: "parts_vehicle_id_fkey"
@@ -887,6 +929,13 @@ export type Database = {
             foreignKeyName: "recurring_expenses_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "recurring_expenses_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
@@ -961,6 +1010,13 @@ export type Database = {
             foreignKeyName: "service_records_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "service_records_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
@@ -1014,6 +1070,13 @@ export type Database = {
             foreignKeyName: "service_schedules_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "service_schedules_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
@@ -1058,6 +1121,13 @@ export type Database = {
             foreignKeyName: "timeline_notes_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "timeline_notes_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
@@ -1079,6 +1149,7 @@ export type Database = {
           odometer_km: number
           plate: string | null
           purchase_date: string | null
+          purchase_odometer_km: number
           purchase_price: number | null
           sold_date: string | null
           sold_price: number | null
@@ -1105,6 +1176,7 @@ export type Database = {
           odometer_km?: number
           plate?: string | null
           purchase_date?: string | null
+          purchase_odometer_km: number
           purchase_price?: number | null
           sold_date?: string | null
           sold_price?: number | null
@@ -1131,6 +1203,7 @@ export type Database = {
           odometer_km?: number
           plate?: string | null
           purchase_date?: string | null
+          purchase_odometer_km?: number
           purchase_price?: number | null
           sold_date?: string | null
           sold_price?: number | null
@@ -1230,10 +1303,31 @@ export type Database = {
             foreignKeyName: "expenses_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "expenses_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_month_totals: {
+        Row: {
+          all_in_count: number | null
+          all_in_total: number | null
+          car_only_count: number | null
+          car_only_total: number | null
+          currency: string | null
+          month: string | null
+          monthly_count: number | null
+          monthly_total: number | null
+          user_id: string | null
+        }
+        Relationships: []
       }
       v_monthly_impact: {
         Row: {
@@ -1242,6 +1336,38 @@ export type Database = {
           impact_month: string | null
           total: number | null
           user_id: string | null
+        }
+        Relationships: []
+      }
+      v_vehicle_month_totals: {
+        Row: {
+          all_in_count: number | null
+          all_in_total: number | null
+          car_only_count: number | null
+          car_only_total: number | null
+          currency: string | null
+          month: string | null
+          monthly_count: number | null
+          monthly_total: number | null
+          user_id: string | null
+          vehicle_id: string | null
+        }
+        Relationships: []
+      }
+      v_vehicle_totals: {
+        Row: {
+          cost_per_km: number | null
+          currency: string | null
+          km_driven: number | null
+          months_owned: number | null
+          planning_accuracy: number | null
+          project_spend: number | null
+          purchase_price: number | null
+          running_spend: number | null
+          total_invested: number | null
+          total_spend: number | null
+          user_id: string | null
+          vehicle_id: string | null
         }
         Relationships: []
       }

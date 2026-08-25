@@ -54,6 +54,7 @@ colour_hex text                                   -- swatch shown in UI chrome
 fuel_type text                                    -- petrol | diesel | hybrid | ev
 transmission text                                 -- manual | auto | dct | cvt
 purchase_date date, purchase_price bigint, currency char(3)
+purchase_odometer_km int not null                 -- the clock when this owner took it on
 odometer_km int not null default 0                -- highest known reading
 odometer_at date
 hero_photo_path text                              -- storage path in `vehicles`
@@ -65,6 +66,13 @@ archived_at timestamptz
 Rule: `odometer_km` is a denormalised max of all odometer readings across expenses, fuel logs
 and service records. Maintained by trigger — never lower it silently; if a lower reading is
 entered, flag it in the UI rather than accepting it.
+
+Rule: `purchase_odometer_km` is the reading the car was on when this owner took it on, and it
+is what `km_driven` is measured from — a car bought at 34,500km has driven nothing until the
+clock passes 34,500. It defaults to the vehicle's own `odometer_km` at creation, set by a
+trigger rather than a column default because a default cannot reference another column. It is
+never moved by an odometer reading; only an explicit edit changes it, and it can never exceed
+`odometer_km`.
 
 ### categories
 ```
