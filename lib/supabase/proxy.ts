@@ -56,15 +56,28 @@ export async function updateSession(request: NextRequest) {
     url.pathname = '/sign-in'
     url.search = ''
     if (pathname !== '/') url.searchParams.set('next', pathname)
-    return NextResponse.redirect(url)
+    return redirectKeepingCookies(url, response)
   }
 
   if (user && pathname === '/sign-in') {
     const url = request.nextUrl.clone()
     url.pathname = '/today'
     url.search = ''
-    return NextResponse.redirect(url)
+    return redirectKeepingCookies(url, response)
   }
 
   return response
+}
+
+/**
+ * A redirect built from scratch carries none of the cookies Supabase just
+ * wrote, so a token refreshed on this request would be thrown away and the
+ * browser would keep presenting the stale one. Carry them across.
+ */
+function redirectKeepingCookies(url: URL, source: NextResponse): NextResponse {
+  const redirect = NextResponse.redirect(url)
+  for (const cookie of source.cookies.getAll()) {
+    redirect.cookies.set(cookie)
+  }
+  return redirect
 }

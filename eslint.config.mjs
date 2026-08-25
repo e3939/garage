@@ -44,9 +44,9 @@ const config = [
     rules: { 'garage/no-emoji': 'error' },
   },
 
-  // --- The emoji ban, over migrations and seed data.
+  // --- The emoji ban, over migrations, seed data and email templates.
   {
-    files: ['supabase/**/*.sql'],
+    files: ['supabase/**/*.{sql,html}'],
     plugins: { garage },
     language: 'garage/text',
     rules: { 'garage/no-emoji': 'error' },

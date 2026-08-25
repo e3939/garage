@@ -243,6 +243,18 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Sign-in is a six-digit code, not a link. Both templates carry {{ .Token }}
+# because GoTrue picks `confirmation` for an address it has never seen and
+# `magic_link` for one it has. The cloud project needs the same two edited by
+# hand -- see docs/07-DEPLOY.md.
+[auth.email.template.magic_link]
+subject = "Your Garage sign-in code"
+content_path = "./supabase/templates/sign-in-code.html"
+
+[auth.email.template.confirmation]
+subject = "Your Garage sign-in code"
+content_path = "./supabase/templates/sign-in-code.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

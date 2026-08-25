@@ -37,7 +37,7 @@ export {
   House, // Today
   SlidersHorizontal, // Settings
   SignOut, // Sign out
-  PaperPlaneTilt, // Send the magic link
+  PaperPlaneTilt, // Send the sign-in code
   CircleNotch, // Pending
 } from '@phosphor-icons/react/dist/ssr'
 
