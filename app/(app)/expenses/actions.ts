@@ -12,6 +12,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { syncAttachments } from '@/lib/attachments/server'
 import { expenseIdSchema, expenseWriteSchema, type ExpenseWrite } from '@/lib/expenses/schema'
 import { fetchLedgerPage, LEDGER_PAGE_SIZE, type LedgerPage } from '@/lib/queries/expenses'
 import type { LedgerCursor } from '@/lib/expenses/types'
@@ -62,7 +63,16 @@ function toRow(input: ExpenseWrite, userId: string) {
   }
 }
 
-export async function createExpenseAction(raw: unknown): Promise<ActionResult> {
+/**
+ * Photos travel with the write rather than in a second call. They are already in
+ * storage by the time this runs — the browser uploaded them while the sheet was
+ * open — so what lands here is metadata, and it lands in the same round trip as
+ * the expense so a save cannot half-succeed into a receipt with no expense.
+ */
+export async function createExpenseAction(
+  raw: unknown,
+  rawAttachments: unknown = [],
+): Promise<ActionResult> {
   const parsed = expenseWriteSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) }
 
@@ -73,11 +83,17 @@ export async function createExpenseAction(raw: unknown): Promise<ActionResult> {
   const { error } = await supabase.from('expenses').insert(toRow(parsed.data, userId))
   if (error) return { ok: false, error: error.message }
 
+  const photoError = await syncAttachments('expense', parsed.data.id, userId, rawAttachments)
+  if (photoError) return { ok: false, error: photoError }
+
   revalidateExpenseScreens()
   return { ok: true }
 }
 
-export async function updateExpenseAction(raw: unknown): Promise<ActionResult> {
+export async function updateExpenseAction(
+  raw: unknown,
+  rawAttachments: unknown = [],
+): Promise<ActionResult> {
   const parsed = expenseWriteSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) }
 
@@ -89,6 +105,9 @@ export async function updateExpenseAction(raw: unknown): Promise<ActionResult> {
   const { error } = await supabase.from('expenses').update(columns).eq('id', id)
   if (error) return { ok: false, error: error.message }
 
+  const photoError = await syncAttachments('expense', id, userId, rawAttachments)
+  if (photoError) return { ok: false, error: photoError }
+
   revalidateExpenseScreens()
   return { ok: true }
 }
@@ -97,6 +116,10 @@ export async function updateExpenseAction(raw: unknown): Promise<ActionResult> {
  * Hard delete. History that matters is soft-deleted elsewhere in the schema, but
  * an expense the user says was a mistake should leave no trace — the undo path
  * is `restoreExpenseAction`, which puts the same id back.
+ *
+ * The attachment rows cascade away with it. The storage objects are deliberately
+ * left: they are what the undo needs to put the photos back, and an orphaned
+ * object costs storage rather than correctness. See AUTOPILOT-NOTES.md.
  */
 export async function deleteExpenseAction(rawId: unknown): Promise<ActionResult> {
   const parsed = expenseIdSchema.safeParse(rawId)
@@ -115,7 +138,11 @@ export async function deleteExpenseAction(rawId: unknown): Promise<ActionResult>
  * ledger's keyset order is (occurred_on, created_at, id) and a restored row that
  * arrives with a fresh timestamp would reappear in the wrong place.
  */
-export async function restoreExpenseAction(raw: unknown, createdAt?: string): Promise<ActionResult> {
+export async function restoreExpenseAction(
+  raw: unknown,
+  createdAt?: string,
+  rawAttachments: unknown = [],
+): Promise<ActionResult> {
   const parsed = expenseWriteSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) }
 
@@ -128,6 +155,11 @@ export async function restoreExpenseAction(raw: unknown, createdAt?: string): Pr
 
   const { error } = await supabase.from('expenses').insert(row)
   if (error) return { ok: false, error: error.message }
+
+  // The rows went with the expense; the objects did not, so undoing a delete
+  // brings the photographs back and not just the amount.
+  const photoError = await syncAttachments('expense', parsed.data.id, userId, rawAttachments)
+  if (photoError) return { ok: false, error: photoError }
 
   revalidateExpenseScreens()
   return { ok: true }

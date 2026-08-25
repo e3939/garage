@@ -318,3 +318,145 @@
     display: none;
   }
 }
+
+@layer components {
+
+  /* ---------------------------------------------------------------------
+     Torn-edge thumbnails. docs/03-DESIGN.md, signature element 4: a photo in
+     the feed is a small torn-edge thumbnail, "a CSS mask giving one irregular
+     edge", tilted one to two degrees from a hash of the row id.
+
+     Four masks rather than one, because a column of thumbnails all torn along
+     the same edge stops reading as torn paper and starts reading as a border
+     style. Which edge and how much tilt both come from `lib/timeline/tilt.ts`,
+     so they are stable across renders and varied down the feed.
+
+     The tilt is a transform, so it is dropped under reduced motion along with
+     every other transform in the app.
+     --------------------------------------------------------------------- */
+  .torn {
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    transform: rotate(var(--tilt, 0deg));
+  }
+  .torn-b {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M0%200%20H100%20V86%20L92%2091%2084%2085%2076%2092%2068%2086%2060%2093%2052%2087%2044%2092%2036%2086%2028%2092%2020%2086%2012%2091%204%2085%200%2090%20Z%22%20fill%3D%22%23000%22%2F%3E%3C%2Fsvg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M0%200%20H100%20V86%20L92%2091%2084%2085%2076%2092%2068%2086%2060%2093%2052%2087%2044%2092%2036%2086%2028%2092%2020%2086%2012%2091%204%2085%200%2090%20Z%22%20fill%3D%22%23000%22%2F%3E%3C%2Fsvg%3E");
+  }
+  .torn-t {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M0%20100%20H100%20V14%20L92%209%2084%2015%2076%208%2068%2014%2060%207%2052%2013%2044%208%2036%2014%2028%208%2020%2014%2012%209%204%2015%200%2010%20Z%22%20fill%3D%22%23000%22%2F%3E%3C%2Fsvg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M0%20100%20H100%20V14%20L92%209%2084%2015%2076%208%2068%2014%2060%207%2052%2013%2044%208%2036%2014%2028%208%2020%2014%2012%209%204%2015%200%2010%20Z%22%20fill%3D%22%23000%22%2F%3E%3C%2Fsvg%3E");
+  }
+  .torn-r {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M0%200%20V100%20H86%20L91%2092%2085%2084%2092%2076%2086%2068%2093%2060%2087%2052%2092%2044%2086%2036%2092%2028%2086%2020%2091%2012%2085%204%2090%200%20Z%22%20fill%3D%22%23000%22%2F%3E%3C%2Fsvg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M0%200%20V100%20H86%20L91%2092%2085%2084%2092%2076%2086%2068%2093%2060%2087%2052%2092%2044%2086%2036%2092%2028%2086%2020%2091%2012%2085%204%2090%200%20Z%22%20fill%3D%22%23000%22%2F%3E%3C%2Fsvg%3E");
+  }
+  .torn-l {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M100%200%20V100%20H14%20L9%2092%2015%2084%208%2076%2014%2068%207%2060%2013%2052%208%2044%2014%2036%208%2028%2014%2020%209%2012%2015%204%2010%200%20Z%22%20fill%3D%22%23000%22%2F%3E%3C%2Fsvg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M100%200%20V100%20H14%20L9%2092%2015%2084%208%2076%2014%2068%207%2060%2013%2052%208%2044%2014%2036%208%2028%2014%2020%209%2012%2015%204%2010%200%20Z%22%20fill%3D%22%23000%22%2F%3E%3C%2Fsvg%3E");
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .torn {
+      transform: none;
+    }
+  }
+
+  /* ---------------------------------------------------------------------
+     The full-screen photo viewer. A native <dialog> again, so the focus trap,
+     the escape key and the inert background are the platform's. It is the one
+     surface in the app that is not paper: a photograph judged against ivory
+     reads warmer than it is, and the point of opening it full screen is to
+     look at the photograph.
+     --------------------------------------------------------------------- */
+  .viewer {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background-color: #16130f;
+    color: var(--paper);
+    overflow: hidden;
+  }
+
+  .viewer::backdrop {
+    background-color: #16130f;
+  }
+
+  .viewer[open] {
+    animation: viewer-appear var(--duration-enter) var(--ease-enter);
+  }
+
+  @keyframes viewer-appear {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* One frame per photo, snapped, so a swipe is the browser's own scrolling
+     rather than a gesture library. Zooming turns snapping off for that frame
+     (see the component) so a pan does not fly to the next picture. */
+  .viewer-track {
+    display: flex;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior: contain;
+  }
+
+  .viewer-track::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ---------------------------------------------------------------------
+     A row of the build log.
+
+     Ledger rows are a fixed 64px and virtualise by arithmetic. A timeline row
+     is not: it carries a variable number of photographs and an expandable fuel
+     month, so its height cannot be known without laying it out. This hands the
+     same job to the browser -- rendering and layout are skipped for anything
+     off screen, and the reserved size keeps the scrollbar honest until a row
+     has been measured once. Photos below the fold are lazy on top of it, so an
+     unscrolled feed downloads the pictures it is actually showing.
+     --------------------------------------------------------------------- */
+  .feed-row {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 72px;
+  }
+
+  /* The viewer's own chrome: the counter, the close button and the caption.
+     Written as classes rather than utilities because this is the one surface in
+     the app that is not paper, and the palette has no token for "over a
+     photograph". */
+  .viewer-chrome {
+    background-color: rgba(22, 19, 15, 0.66);
+    color: var(--paper);
+  }
+
+  .viewer-text {
+    color: var(--paper);
+  }
+
+  .viewer-frame {
+    position: relative;
+    flex: 0 0 100%;
+    scroll-snap-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+}

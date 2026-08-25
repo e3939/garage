@@ -3,7 +3,7 @@ import { categoryIconMap } from '@/components/expenses/category-icons'
 import { todayIso } from '@/lib/dates'
 import { fetchRankedCategories } from '@/lib/queries/categories'
 import { fetchAmortiseThreshold } from '@/lib/queries/expenses'
-import { fetchProfilePreferences } from '@/lib/queries/profile'
+import { fetchProfilePreferences, fetchUserId } from '@/lib/queries/profile'
 import { fetchVehicleOptions } from '@/lib/queries/vehicles'
 
 /**
@@ -15,15 +15,21 @@ import { fetchVehicleOptions } from '@/lib/queries/vehicles'
  * icons, so opening it costs no network at all.
  */
 export default async function DefaultFab() {
-  const [categories, vehicles, preferences, amortiseThreshold] = await Promise.all([
+  const [categories, vehicles, preferences, amortiseThreshold, userId] = await Promise.all([
     fetchRankedCategories(),
     fetchVehicleOptions(),
     fetchProfilePreferences(),
     fetchAmortiseThreshold(),
+    fetchUserId(),
   ])
+
+  // The layout has already redirected anonymous traffic, so this is a type
+  // narrowing rather than a check.
+  if (!userId) return null
 
   return (
     <QuickAdd
+      userId={userId}
       categories={categories}
       icons={categoryIconMap(categories)}
       vehicles={vehicles}

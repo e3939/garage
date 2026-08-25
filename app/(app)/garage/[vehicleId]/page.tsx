@@ -3,14 +3,18 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { timelineKindIcons } from '@/components/timeline/kind-icons'
+import { TimelineFeed } from '@/components/timeline/timeline-feed'
 import { Total } from '@/components/totals/total'
 import { ViewSwitcher } from '@/components/totals/view-switcher'
 import { ServicePanel } from '@/components/vehicles/service-panel'
 import { VehicleHero } from '@/components/vehicles/vehicle-hero'
 import { VehicleMonthTotal } from '@/components/vehicles/vehicle-month-total'
 import { monthStart, todayIso } from '@/lib/dates'
+import { monthLabel } from '@/lib/dates-display'
 import type { RawSearchParams } from '@/lib/expenses/filters'
-import { fetchProfilePreferences } from '@/lib/queries/profile'
+import { fetchProfilePreferences, fetchUserId } from '@/lib/queries/profile'
+import { fetchTimelinePage } from '@/lib/queries/timeline'
 import { fetchVehicle, fetchVehicleMonthTotals, fetchVehicleTotals } from '@/lib/queries/vehicles'
 import { signedUrl } from '@/lib/storage/signed-url'
 import { parseSpendView, SPEND_VIEW_PARAM } from '@/lib/views'
@@ -56,10 +60,12 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   const view = parseSpendView(firstParam(raw[SPEND_VIEW_PARAM]), preferences.defaultView)
   const month = monthStart(todayIso())
 
-  const [totals, monthTotals, heroUrl] = await Promise.all([
+  const [totals, monthTotals, heroUrl, timeline, userId] = await Promise.all([
     fetchVehicleTotals(vehicle.id, preferences.baseCurrency),
     fetchVehicleMonthTotals(vehicle.id, month, preferences.baseCurrency),
     signedUrl('vehicles', vehicle.hero_photo_path),
+    fetchTimelinePage(vehicle.id),
+    fetchUserId(),
   ])
 
   const search = new URLSearchParams()
@@ -107,6 +113,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         <VehicleMonthTotal
           vehicleId={vehicle.id}
           month={month}
+          monthContext={monthLabel(month)}
           totals={monthTotals}
           view={view}
           currency={preferences.baseCurrency}
@@ -139,9 +146,21 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         </ul>
       </nav>
 
+      <section className="space-y-3">
+        <h2 className="text-eyebrow font-display uppercase text-ink-muted">Build log</h2>
+        <TimelineFeed
+          vehicleId={vehicle.id}
+          page={timeline}
+          icons={timelineKindIcons()}
+          locale={preferences.locale}
+          today={todayIso()}
+          userId={userId ?? ''}
+          lastReading={vehicle.odometer_km}
+        />
+      </section>
+
       <p className="text-caption text-ink-muted">
-        The timeline arrives in Phase 4, the mod board in Phase 5, and service, fuel and parts
-        in Phase 6.
+        The mod board arrives in Phase 5, and service, fuel and parts in Phase 6.
       </p>
     </div>
   )

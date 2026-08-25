@@ -1339,6 +1339,21 @@ export type Database = {
         }
         Relationships: []
       }
+      v_timeline: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          currency: string | null
+          kind: Database["public"]["Enums"]["timeline_kind"] | null
+          occurred_on: string | null
+          ref_id: string | null
+          subtitle: string | null
+          title: string | null
+          user_id: string | null
+          vehicle_id: string | null
+        }
+        Relationships: []
+      }
       v_vehicle_month_totals: {
         Row: {
           all_in_count: number | null
@@ -1412,6 +1427,28 @@ export type Database = {
           odometer_km: number
           vehicle_id: string
           vehicle_nickname: string
+        }[]
+      }
+      timeline_page: {
+        Args: {
+          p_cursor_created_at?: string
+          p_cursor_id?: string
+          p_cursor_occurred_on?: string
+          p_limit?: number
+          p_vehicle_id: string
+        }
+        Returns: {
+          amount: number
+          created_at: string
+          currency: string
+          items: Json
+          kind: Database["public"]["Enums"]["timeline_kind"]
+          occurred_on: string
+          photos: Json
+          ref_id: string
+          subtitle: string
+          title: string
+          vehicle_id: string
         }[]
       }
     }

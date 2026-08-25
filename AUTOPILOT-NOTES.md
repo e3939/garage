@@ -1079,3 +1079,320 @@ somehow negative.
 5. **The bundle table above**, and the 3KB of headroom on `/today` before Phase 4 starts.
 6. **Archive a car and undo it**, then confirm its expenses are all still in the ledger and
    still attached to it.
+
+---
+
+## Phase 5 — Attachments and the timeline
+
+Branch: `feat/05-timeline` (the roadmap names this branch `feat/timeline` and calls it Phase 4;
+as in every phase before it the branch already existed under the other name when the run
+started and was left alone. The heading here follows the branch number so the sections in this
+file stay in order — it is roadmap Phase 4, "Attachments and the timeline").
+
+### What was built
+
+- **One photo field, used by everything with photos.** `<AttachmentField>` takes several files
+  at once, resizes each to a 1600px long edge and re-encodes it as WebP at roughly 400KB on the
+  device, uploads three at a time with a progress bar per file, and then lets each one be
+  captioned, reordered and removed. It replaces the Phase 2 stub in the expense form and is the
+  same component the timeline note form uses. The compression library and the Supabase browser
+  client are imported at the moment a file is picked, and the field itself is a dynamic chunk
+  that arrives when the More disclosure opens — so a screen nobody attaches a photo on pays
+  nothing for it.
+- **`v_timeline` and `timeline_page`.** The view is the `union all` from
+  `docs/02-DATA-MODEL.md`: expenses, mods, service records, fuel logs, milestones and notes,
+  normalised to one shape. The function pages it by keyset on `(occurred_on, created_at,
+  ref_id)`, collapses a month of fill-ups into one row **before** the keyset is applied so a
+  month can never straddle a page boundary, and brings every row's attachments with it. A page
+  of the feed is two round trips whatever it holds: one for the rows and their photo metadata,
+  one to sign every URL on the page.
+- **The build log on the vehicle page.** Day-grouped, each row carrying the canonical icon for
+  its `timeline_kind`, fuel collapsed to "4 fill-ups" with the individual fills one tap away,
+  and photos as torn-edge thumbnails whose tilt and torn edge are both derived from a hash of
+  the attachment id — stable across a server render, a hydration and a reload, varied down the
+  feed. Images below the fold are lazy, every frame reserves its square before the image
+  arrives, and off-screen rows are skipped by `content-visibility: auto` rather than by the
+  ledger's measured virtualisation, because a timeline row is not a fixed height.
+- **Timeline notes.** The cost-free half of the log — title, date, odometer, body, photos and
+  no amount at all. Added from a secondary action sitting above the brick FAB on the vehicle
+  page, and edited or deleted by tapping the entry's title in the feed, with an Undo that puts
+  the note and its photographs back.
+- **The full-screen viewer.** Swipe between the photos on an entry, pinch or double-tap to
+  zoom, read the caption, close. Swiping is the browser's own scroll with mandatory snap
+  points rather than a gesture library — momentum, rubber-banding and an honest scroll position
+  for no JavaScript — and the only gesture written by hand is the pinch, because nothing in CSS
+  reports one. While a photo is zoomed the track stops scrolling so a pan does not fly to the
+  next picture.
+
+### Proof it works
+
+`npm test` — **178 hermetic tests**, 30 of them new across `lib/timeline/tilt.test.ts`,
+`lib/timeline/types.test.ts`, `lib/attachments/schema.test.ts` and the daylight-saving cases
+added to `lib/dates.test.ts`. `npm run test:db` — **96 against a database reset from zero**,
+12 of them new in `lib/queries/timeline.db.test.ts`. `npm run typecheck`, `npm run lint`
+(0 errors, 3 pre-existing react-hook-form compiler warnings) and `npm run build` all clean.
+`npx supabase db reset` replays all fourteen migrations from nothing.
+
+Beyond the suites, the production build was driven over HTTP with a real magic-link session,
+with real WebP objects in the `receipts` and `vehicles` buckets and the Server Actions called
+directly by their action ids. **49 checks, all passing:**
+
+| Check | Result |
+|---|---|
+| `/garage/[id]` with a month of activity on it | 200, and the feed holds the expense, the note, the installed mod, the milestone and the service record |
+| Four fill-ups in one month | one row, `4 fill-ups`, expandable |
+| Thumbnails | `class="torn torn-b"`, `--tilt: -1.5deg`, served through `/_next/image?url=` off a signed URL |
+| Images below the fold | `loading="lazy"`, and every frame carries `width:72px;height:72px` before it loads |
+| The has-photo filter | `?photo=yes` finds the row with a receipt and excludes the one without; `?photo=no` is the mirror |
+| `createExpenseAction` with two photos | expense written, both `attachments` rows written, captions in order |
+| `updateExpenseAction` dropping one | the row goes **and so does the storage object** |
+| `deleteExpenseAction` | attachment rows cascade away, the objects survive |
+| `restoreExpenseAction` with the held photos | the photographs come back, not just the amount |
+| A forged `storage_path` (`../../etc/passwd`) | rejected: "That is not a storage path this app writes" |
+| `createTimelineNoteAction` with a blank title | rejected: "Give the entry a title" |
+| `discardUploadAction` on a path outside the caller's folder | rejected: "Unknown photo" |
+| A second user opening the first user's vehicle | 404, and `timeline_page` on that vehicle id returns nothing |
+| Emoji anywhere in the rendered page | none |
+
+### Route size, before and after
+
+Images are the largest performance risk in this app, so the phase brief asked for the
+transferred size of the route before and after. `npm run build && npm run measure:bundles`,
+against the same local stack, at the parent commit and at this one:
+
+| Route | Own JS before | Own JS after |
+|---|---|---|
+| `/today` | 36.4KB | **32.3KB** |
+| `/ledger` | 37.4KB | **32.7KB** |
+| `/garage` | 34.9KB | **38.5KB** |
+| `/garage/[vehicleId]` | 34.9KB | **45.4KB** |
+| `/garage/new` | 22.5KB | **16.1KB** |
+| `/money` | 26.2KB | **28.3KB** |
+| `/settings` | 0.0KB | 0.0KB |
+| `/settings/categories` | 11.9KB | 12.1KB |
+
+Shared baseline 139.7KB across eight chunks, up 0.3KB from 139.4KB — nothing landed in the
+shell.
+
+**`/garage/[vehicleId]` is 5.4KB over the 40KB route ceiling. It is the only route that misses
+it, and it is the one screen in the app that renders a feed of photographs.** Its 45.4KB
+breaks down as: 27.3KB of expense-form, react-hook-form, date-fns and money machinery that
+every route with a FAB carries and that `/money` also pays; 10.2KB of `next/image`'s client
+runtime plus the view switcher and the month total; **5.0KB of feed** — the rows, the day
+grouping, the fuel group, the thumbnail and the viewer's loader; and 2.9KB of the note form and
+the second FAB action. So the code this phase wrote is about eight kilobytes of the number; the
+rest was already there and is now counted against one route because Turbopack groups it
+differently. Dropping `next/image` would claw back ten of them and cost far more in image bytes
+on a screen full of photographs, which is a bad trade on the axis that actually matters here.
+
+Image bytes, which is the risk the brief was really about: a photo is 1600px of WebP at roughly
+400KB in storage, and the feed asks `next/image` for it at 72px with an explicit `sizes`, so
+what a phone downloads for a thumbnail is a few kilobytes. Nothing below the fold is fetched
+until it is scrolled to.
+
+### The date module was split, and why
+
+Halfway through this phase `/garage` was **44.6KB**, ten kilobytes worse than before it, with
+two byte-identical copies of the same date-fns chunk in its script set. Four attempts to make
+Turbopack stop emitting the duplicate failed (dynamic-importing the note form, removing the
+vehicle FAB slot, statically importing the photo field, adding `date-fns` to
+`optimizePackageImports`), and per the three-strikes rule those were abandoned.
+
+The fix in the end was not a chunker fight but a real one. `lib/dates.ts` mixed two unrelated
+jobs: calendar arithmetic on `YYYY-MM-DD` strings, which is pure and tiny, and turning a date
+into words, which needs a locale's worth of month names, weekday names and era names — around
+eight kilobytes gzipped — and which landed in the client bundle of anything that so much as
+imported the module. So:
+
+- **`lib/dates.ts` no longer imports date-fns.** It keeps `todayIso`, `monthStart`,
+  `addMonthsToMonthStart`, `isIsoDate` and `addDays`. `addDays` was rewritten to do its
+  arithmetic in UTC, which is also a small correctness win — the old one went through a local
+  `Date`, and a 23-hour day is exactly how "yesterday" becomes the day before yesterday for
+  half the world. There are tests for that now.
+- **`lib/dates-display.ts` is new** and holds `monthName`, `monthLabel`, `dateLabel` and
+  `dayHeading`. It imports date-fns. Every screen that prints a date imports this instead.
+- **Two components now take their label as a prop.** `MonthTotal` and `VehicleMonthTotal` are
+  otherwise pure arithmetic; they receive `monthContext` ("August 2026") already formatted by
+  the server, the same way they already receive icons as finished elements.
+- **The feed's dates are formatted on the server too**, including for pages fetched later by
+  "Load older": `fetchTimelinePage` puts `day_heading` and `date_label` on every row.
+
+`/garage` came back to 38.5KB and `/garage/new` fell from 22.5KB to 16.1KB. This is a change to
+Phase 1 and Phase 3 files inside a Phase 4 branch, which is scope creep by the letter of
+CLAUDE.md section 7 — it is here because CLAUDE.md section 2 point 2 says a change that
+regresses the budget gets reverted rather than debated, and this was the honest way to unwind
+the regression rather than paper over it.
+
+### Assumptions
+
+1. **`v_timeline` carries three columns beyond the tuple the data model names.** The document
+   normalises to `(user_id, vehicle_id, occurred_on, kind, ref_id, title, subtitle, amount)`;
+   the view also selects `currency` (a money column cannot be formatted without it),
+   `created_at` (the document's own ordering names it, so it has to be selectable) and nothing
+   else. All three are derived rather than new facts, so `docs/02-DATA-MODEL.md` was not
+   edited — the same reasoning Phase 3 used for `total_invested`.
+2. **`ref_id` is the row's id.** The phase brief asks for a keyset on `(occurred_on,
+   created_at, id)`. Every source table is keyed by a uuid, so `ref_id` is unique across the
+   union and is what the keyset's third column is. No separate `id` column was invented.
+3. **A mod is one row, not one row per status change.** Nothing in the schema records a status
+   history, so the honest date for a mod is the day it was installed if it was and the day it
+   was planned if it was not, with the current status as the subtitle. Phase 5 owns the board;
+   if it adds a transitions table, this view gains a branch.
+4. **Fuel is collapsed in the function, not in the view.** `docs/01-PRODUCT.md` asks for
+   "4 fill-ups" in the feed, which is a presentation rule; the view stays faithful to the data
+   model's contract and `timeline_page` does the grouping. It groups before applying the
+   keyset, so a month is one row wherever the page boundary falls.
+5. **A grouped fuel row's id is `md5(vehicle || ':fuel:' || month)`.** It has to be stable
+   across pages and it is not a row in any table. The individual fills travel with it in
+   `items`, so expanding costs no round trip.
+6. **Photos are found by `coalesce` over the six owner columns.** The single-owner check
+   constraint guarantees exactly one is non-null, so their coalesce is the owner's id and is
+   unique across the table. An expression index on it makes "every attachment on this page" an
+   index scan. That index is new and is not in `docs/02-DATA-MODEL.md`, which does not list
+   indexes — same footing as the trigram indexes Phase 2 added.
+7. **Bucket and `attachment_kind` are decided by what owns the photo, once, in
+   `ATTACHMENT_TARGET`.** Expenses and service and fuel receipts go to `receipts` as `receipt`;
+   mod inspiration goes to `inspiration` as `inspiration`; timeline notes and parts go to
+   `vehicles` as `progress`, because those are photographs of the car and the car's bucket is
+   where the car's pictures live. Three buckets, six owners; the mapping is stated rather than
+   guessed at each call site.
+8. **A life expense's photos go to `{user_id}/general/{uuid}.webp`.** The path convention has
+   three segments and a life expense has no vehicle. A two-segment path would put the object
+   where a vehicle folder is expected; the storage policy only ever checks the first segment,
+   so this is safe either way.
+9. **Photos travel with the write, not in a second call.** `createExpenseAction` and
+   `updateExpenseAction` take the list as a second argument and sync it in the same round trip.
+   The files are already in storage by then — they went up while the sheet was open, which is
+   what keeps Save instant — so what lands is metadata.
+10. **Removing a photo from a record deletes the object; deleting the record does not.** A
+    photo taken off a record is one the user meant to be rid of, and an object with no row
+    pointing at it can never be found again. Deleting the *expense* is different: the rows
+    cascade away but the objects are left, because they are exactly what the Undo needs. The
+    ledger hands the photos it already loaded to `restoreExpenseAction`, and the note feed does
+    the same for `createTimelineNoteAction`. **The cost is that an expense deleted and never
+    undone leaves its objects behind.** A sweep for unreferenced objects is still owed — it was
+    first noted in Phase 3 and this phase adds a second source of them.
+11. **The edit sheet loads its photos on the tap that opens it.** A page of the ledger is forty
+    rows and one of them gets tapped; sending forty sets of metadata and forty signed URLs so
+    that one can be opened would be the wrong trade. The tap is the event, so the fetch is in
+    the handler rather than in an effect watching the state.
+12. **The signed-URL cache was not changed.** The brief asks for "cached per request"; the
+    helper Phase 3 built holds URLs process-wide until five minutes before they expire, which
+    is strictly stronger, and it already signs in batches. What is new is `signAttachments`,
+    which groups a page's photos by bucket so a feed costs one request per bucket — in practice
+    one — rather than one per photograph.
+13. **Reordering is two buttons, "Earlier" and "Later", not a drag handle.** Drag-and-drop on a
+    phone inside a scrolling bottom sheet fights the sheet's own scroll, and the design system
+    has no drag affordance yet. Two 44px buttons work with a thumb, with a keyboard and with a
+    screen reader. The mod board in Phase 5 needs real touch dragging and is where that belongs.
+14. **The photo field's controls are words, not glyphs.** "Earlier", "Later", "Remove". Phosphor
+    has arrow and trash glyphs, but the canonical mapping table in `docs/03-DESIGN.md` has no
+    row for either, and adding an icon means adding a row to that table first — which this
+    phase was not pre-approved to edit. Words need no vocabulary and no icon plumbing into a
+    client component.
+15. **Four torn edges, six tilts, seeded separately.** One mask would make a column of
+    thumbnails read as a border style rather than as torn paper; one seed for both would give
+    four visible combinations instead of twenty-four. The tilt is never zero, because a photo
+    that happens to hash to flat reads as a mistake rather than as variety.
+16. **The feed is not virtualised the way the ledger is.** Ledger rows are a fixed 64px and
+    virtualise by arithmetic; a timeline row carries a variable number of photographs and an
+    expandable fuel month, so its height cannot be known without laying it out.
+    `content-visibility: auto` with a reserved intrinsic size hands the same job to the browser,
+    which skips rendering and layout off screen and keeps the scroll height honest. A page is
+    thirty rows rather than the ledger's forty for the same reason.
+17. **A note is tapped by its title, not by its row.** The photographs under it are buttons of
+    their own and a button cannot contain a button. Only notes open: every other kind of entry
+    is written by the thing that caused it and is edited where that thing lives.
+18. **The secondary FAB action is a labelled pill above the brick FAB.** The FAB keeps its job —
+    it is the same control on every screen and moving it would cost more than a second action is
+    worth — and both sit in the bottom third and clear 44px.
+19. **The viewer is the one surface in the app that is not paper.** A photograph judged against
+    ivory reads warmer than it is. Its chrome is written as CSS classes rather than utilities
+    because the palette has no token for "over a photograph".
+20. **Twelve photos per record.** The schema has no limit; twelve is a thorough day in the
+    garage and it keeps one write from carrying an unbounded array.
+
+### Migration
+
+**One, and it needs a push.** `supabase db push` is blocked in this run, so:
+
+- `0014_timeline.sql` — `v_timeline`, the `timeline_page` function, one expression index on
+  `attachments`, and their grants. **No table changes, no new columns, no new enums.** It
+  replays clean from zero and it is additive, so it can be pushed before or after the deploy
+  without a window where the app is broken.
+
+`lib/supabase/types.ts` was regenerated (`npm run db:types`) and is committed with it.
+
+### Not built, and why
+
+- **The stamp treatment for milestones and installed mods.** Signature element 3 in
+  `docs/03-DESIGN.md` — a rotated dealer stamp on cream. It is listed under roadmap Phase 8
+  ("stamps"), and this phase's brief names only the torn-edge thumbnails. Milestones and
+  installed mods render as ordinary rows with their canonical icons until then.
+- **Torn-edge thumbnails on the ledger row.** Signature element 4 describes them "in the
+  ledger", but `docs/03-DESIGN.md`'s later "The ledger detail line" section — added in Phase 3 —
+  fixes the row at 64px with structured fields only and marks a photo with a `Camera` glyph, and
+  the virtual list depends on that height. The torn-edge treatment is in the feed and in the
+  edit sheet, where there is room for it. **This is a genuine conflict between two sections of
+  the design document and it was resolved in favour of the more recent one; the document was not
+  edited.**
+- **Attachments on mods, parts, fuel logs and service records.** `<AttachmentField>` takes an
+  `owner` and `ATTACHMENT_TARGET` already names all six, but the screens that own those records
+  are Phases 5 and 6. Wiring them is a prop, not a component.
+- **A sweep for orphaned storage objects**, per assumption 10.
+- **`v_service_due` and `v_fuel_consumption`.** Roadmap Phase 6.
+- **Reordering photos by dragging**, per assumption 13.
+
+### Where confidence is low
+
+- **`/garage/[vehicleId]` misses the route budget by 5.4KB**, per the table above. It is the
+  only route that does, and about eight kilobytes of its total is code this phase wrote.
+- **Nothing was driven through a real browser, again.** Every route, every server action, the
+  RLS boundary and the rendered markup of the feed were exercised over HTTP against the
+  production build, but the pinch gesture, the swipe between photos, the compression progress
+  bars running three at a time and the torn mask under real light were reasoned about and
+  server-rendered, not touched. **The viewer's pinch-zoom is the least-verified thing in the
+  phase** — it is hand-written touch handling, it is the one place in the app where a gesture is
+  not the platform's, and a two-finger gesture cannot be tested without two fingers.
+- **HEIC is still the one input the compression library cannot decode**, exactly as in Phase 3.
+  iOS Safari converts to JPEG for an `accept="image/*"` picker, which is why this is expected to
+  work; multi-select makes it more likely that one file in a batch is the one that does not. A
+  file that fails now fails alone, with its own message and a Dismiss, rather than taking the
+  batch with it — but that path has not been seen fail for real.
+- **Three lanes of compression is a guess.** It keeps the main thread responsive on a mid-range
+  phone in principle and overlaps each file's upload with the next file's compression, but it
+  was not measured on a phone. It is `LANES` at the top of
+  `components/attachments/attachment-field.tsx`.
+- **`content-visibility: auto` reserves 72px per row** until a row has been laid out once. On a
+  feed of photo-heavy entries the scrollbar will be optimistic on first paint and settle as you
+  scroll. That is the trade for not measuring; the alternative is the ledger's fixed-height
+  rows, which a photo does not fit in.
+- **The fuel group has never been seen with real data.** `fuel_logs` is written by Phase 6, so
+  every fill-up in every test here was inserted by hand. The grouping, the totals and the
+  expansion are proved against Postgres; whether "4 fill-ups" is the right thing to read in a
+  real month is a judgement nobody can make yet.
+- **`timeline_page` reads `v_timeline` and filters it by vehicle**, which means the planner has
+  to push that predicate through a six-way union on every page. It is correct and it is fast on
+  one person's data. Whether it stays fast at ten thousand rows is a Phase 7 question and the
+  answer, if not, is a materialised feed table rather than a change to the rule.
+- **`lib/dates.ts` changed under Phase 1 and Phase 3 code.** The split is covered by the
+  existing tests plus new ones for the UTC arithmetic, and typecheck catches every moved import,
+  but it touches more files than a Phase 4 branch ought to. See the section above for why.
+
+### What a reviewer should check first
+
+1. **Open a vehicle with a real month on it and scroll.** That is the acceptance criterion and
+   it is the one thing only a person can judge. Does it read like a stamped service booklet or
+   like a bank statement?
+2. **Attach four photos from a real camera roll, on a real phone.** Watch the three progress
+   bars, check what lands in the `receipts` bucket is WebP and under about 400KB, and check the
+   thumbnails in the feed still look like the thing you photographed. This is the least-verified
+   path in the phase and HEIC is the reason.
+3. **Pinch a photo in the viewer, then swipe.** Zoomed, the swipe should be off; back at 1x it
+   should come back. Double-tap should do the same job on a laptop.
+4. **Delete an expense that had photos and press Undo.** The photographs should come back with
+   it, not just the amount.
+5. **The bundle table above**, and specifically whether 5.4KB over on the one photo-feed route
+   is a price you will pay or a thing to send back.
+6. **`supabase db push` for `0014_timeline.sql`**, after a backup as usual. It is additive and
+   touches no data.

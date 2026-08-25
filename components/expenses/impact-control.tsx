@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { BucketChips } from '@/components/expenses/bucket-chips'
 import { BudgetImpactSwitch } from '@/components/expenses/budget-impact-switch'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
-import { monthName, type IsoDate } from '@/lib/dates'
+import { monthName } from '@/lib/dates-display'
+import type { IsoDate } from '@/lib/dates'
 import { BUCKET_LABEL, BUCKET_VAR, type ExpenseBucket, type VehicleOption } from '@/lib/expenses/types'
 
 type ImpactControlProps = {

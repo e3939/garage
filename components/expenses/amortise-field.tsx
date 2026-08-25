@@ -2,7 +2,8 @@
 'use client'
 
 import { Field, INPUT_CLASS } from '@/components/ui/field'
-import { addMonthsToMonthStart, monthLabel, type IsoDate } from '@/lib/dates'
+import { monthLabel } from '@/lib/dates-display'
+import { addMonthsToMonthStart, type IsoDate } from '@/lib/dates'
 import { formatMoney, splitMinor } from '@/lib/money'
 
 /**

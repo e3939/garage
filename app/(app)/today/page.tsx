@@ -7,10 +7,11 @@ import { LedgerList } from '@/components/ledger/ledger-list'
 import { ledgerSignalIcons } from '@/components/ledger/row-signals'
 import { ViewSwitcher } from '@/components/totals/view-switcher'
 import { monthStart, todayIso } from '@/lib/dates'
+import { monthLabel } from '@/lib/dates-display'
 import { EMPTY_FILTERS, type RawSearchParams } from '@/lib/expenses/filters'
 import { fetchRankedCategories } from '@/lib/queries/categories'
 import { fetchAmortiseThreshold, fetchLedgerPage, fetchMonthSummary } from '@/lib/queries/expenses'
-import { fetchProfilePreferences } from '@/lib/queries/profile'
+import { fetchProfilePreferences, fetchUserId } from '@/lib/queries/profile'
 import { fetchVehicleOptions } from '@/lib/queries/vehicles'
 import { parseSpendView, SPEND_VIEW_PARAM } from '@/lib/views'
 
@@ -36,12 +37,13 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const preferences = await fetchProfilePreferences()
   const view = parseSpendView(firstParam(raw[SPEND_VIEW_PARAM]), preferences.defaultView)
 
-  const [summary, recent, categories, vehicles, amortiseThreshold] = await Promise.all([
+  const [summary, recent, categories, vehicles, amortiseThreshold, userId] = await Promise.all([
     fetchMonthSummary(month, preferences.baseCurrency),
     fetchLedgerPage(EMPTY_FILTERS, null, RECENT_ROWS),
     fetchRankedCategories(),
     fetchVehicleOptions(),
     fetchAmortiseThreshold(),
+    fetchUserId(),
   ])
 
   return (
@@ -50,6 +52,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
 
       <MonthTotal
         month={month}
+        monthContext={monthLabel(month)}
         totals={summary.totals}
         view={view}
         currency={preferences.baseCurrency}
@@ -77,6 +80,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
               locale={preferences.locale}
               amortiseThreshold={amortiseThreshold}
               today={today}
+              userId={userId ?? ''}
             />
             <Link href="/ledger" className="inline-block min-h-touch text-label text-accent">
               Open the ledger

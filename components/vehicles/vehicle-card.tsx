@@ -12,6 +12,8 @@ type VehicleCardProps = {
   vehicle: Vehicle
   heroUrl: string | null
   month: IsoDate
+  /** "August 2026", formatted here on the server. */
+  monthContext: string
   monthTotals: MonthViewTotals
   view: SpendView
   currency: string
@@ -30,6 +32,7 @@ export function VehicleCard({
   vehicle,
   heroUrl,
   month,
+  monthContext,
   monthTotals,
   view,
   currency,
@@ -84,6 +87,7 @@ export function VehicleCard({
         <VehicleMonthTotal
           vehicleId={vehicle.id}
           month={month}
+          monthContext={monthContext}
           totals={monthTotals}
           view={view}
           currency={currency}

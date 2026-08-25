@@ -1,7 +1,7 @@
 import Image from 'next/image'
 
 import { Car, ICON_EMPTY } from '@/components/icons'
-import { dateLabel } from '@/lib/dates'
+import { dateLabel } from '@/lib/dates-display'
 import { heroAlt, specStripParts, vehicleColour, type Vehicle } from '@/lib/vehicles/types'
 
 type VehicleHeroProps = {

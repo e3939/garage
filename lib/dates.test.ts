@@ -1,16 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  addDays,
-  addMonthsToMonthStart,
-  dateLabel,
-  dayHeading,
-  isIsoDate,
-  monthLabel,
-  monthName,
-  monthStart,
-  todayIso,
-} from '@/lib/dates'
+import { addDays, addMonthsToMonthStart, isIsoDate, monthStart, todayIso } from '@/lib/dates'
+import { dateLabel, dayHeading, monthLabel, monthName } from '@/lib/dates-display'
 
 describe('todayIso', () => {
   it('answers in Ho Chi Minh City, not in UTC', () => {
@@ -58,6 +49,21 @@ describe('helpers', () => {
   it('shifts days across a month boundary', () => {
     expect(addDays('2026-03-01', -1)).toBe('2026-02-28')
     expect(addDays('2026-12-31', 1)).toBe('2027-01-01')
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29')
+  })
+
+  it('shifts days across a daylight-saving boundary', () => {
+    // The arithmetic is done in UTC. A local Date would move by 23 or 25 hours
+    // on these two days in a zone that observes DST, which is exactly how
+    // "yesterday" turns into the day before yesterday for half the world.
+    expect(addDays('2026-03-29', -1)).toBe('2026-03-28')
+    expect(addDays('2026-03-29', 1)).toBe('2026-03-30')
+    expect(addDays('2026-11-01', -1)).toBe('2026-10-31')
+    expect(addDays('2026-11-01', 1)).toBe('2026-11-02')
+  })
+
+  it('refuses anything that is not a calendar day', () => {
+    expect(() => addDays('nonsense', 1)).toThrow(RangeError)
   })
 
   it('labels a plain date', () => {

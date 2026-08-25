@@ -3,13 +3,15 @@
 
 import { useExpenseStore } from '@/components/expenses/expense-store'
 import { Total } from '@/components/totals/total'
-import { monthLabel, type IsoDate } from '@/lib/dates'
+import type { IsoDate } from '@/lib/dates'
 import { pendingVehicleMonthDelta } from '@/lib/expenses/optimistic'
 import { SPEND_VIEW_LABEL, totalForView, type MonthViewTotals, type SpendView } from '@/lib/views'
 
 type VehicleMonthTotalProps = {
   vehicleId: string
   month: IsoDate
+  /** "August 2026", formatted on the server. See `MonthTotal` for why. */
+  monthContext: string
   /** All three figures for this vehicle, from `v_vehicle_month_totals`. */
   totals: MonthViewTotals
   view: SpendView
@@ -29,6 +31,7 @@ type VehicleMonthTotalProps = {
 export function VehicleMonthTotal({
   vehicleId,
   month,
+  monthContext,
   totals,
   view,
   currency,
@@ -43,7 +46,7 @@ export function VehicleMonthTotal({
     <Total
       name="This month"
       view={SPEND_VIEW_LABEL[view]}
-      context={monthLabel(month)}
+      context={monthContext}
       amount={total}
       currency={currency}
       locale={locale}

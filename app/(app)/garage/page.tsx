@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { ViewSwitcher } from '@/components/totals/view-switcher'
 import { VehicleCard } from '@/components/vehicles/vehicle-card'
 import { monthStart, todayIso } from '@/lib/dates'
+import { monthLabel } from '@/lib/dates-display'
 import type { RawSearchParams } from '@/lib/expenses/filters'
 import { fetchProfilePreferences } from '@/lib/queries/profile'
 import { fetchGarageMonthTotals, fetchVehicles } from '@/lib/queries/vehicles'
@@ -70,6 +71,7 @@ export default async function GaragePage({ searchParams }: GaragePageProps) {
               vehicle={vehicle}
               heroUrl={heroUrls[index] ?? null}
               month={month}
+              monthContext={monthLabel(month)}
               monthTotals={monthTotals.get(vehicle.id) ?? EMPTY_MONTH_TOTALS}
               view={view}
               currency={preferences.baseCurrency}

@@ -8,7 +8,7 @@ import { todayIso } from '@/lib/dates'
 import { parseFilters, type RawSearchParams } from '@/lib/expenses/filters'
 import { fetchRankedCategories } from '@/lib/queries/categories'
 import { fetchAmortiseThreshold, fetchLedgerPage } from '@/lib/queries/expenses'
-import { fetchProfilePreferences } from '@/lib/queries/profile'
+import { fetchProfilePreferences, fetchUserId } from '@/lib/queries/profile'
 import { fetchVehicleOptions } from '@/lib/queries/vehicles'
 
 export const metadata: Metadata = { title: 'Ledger' }
@@ -26,12 +26,13 @@ type LedgerPageProps = {
 export default async function LedgerPage({ searchParams }: LedgerPageProps) {
   const filters = parseFilters(await searchParams)
 
-  const [page, categories, vehicles, preferences, amortiseThreshold] = await Promise.all([
+  const [page, categories, vehicles, preferences, amortiseThreshold, userId] = await Promise.all([
     fetchLedgerPage(filters),
     fetchRankedCategories(),
     fetchVehicleOptions(),
     fetchProfilePreferences(),
     fetchAmortiseThreshold(),
+    fetchUserId(),
   ])
 
   const icons = categoryIconMap(categories)
@@ -57,6 +58,7 @@ export default async function LedgerPage({ searchParams }: LedgerPageProps) {
         locale={preferences.locale}
         amortiseThreshold={amortiseThreshold}
         today={todayIso()}
+        userId={userId ?? ''}
       />
     </section>
   )

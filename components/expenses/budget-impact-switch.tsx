@@ -1,7 +1,8 @@
 // A real switch with real state.
 'use client'
 
-import { monthName, type IsoDate } from '@/lib/dates'
+import { monthName } from '@/lib/dates-display'
+import type { IsoDate } from '@/lib/dates'
 
 type BudgetImpactSwitchProps = {
   checked: boolean

@@ -3,6 +3,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 
@@ -23,6 +24,27 @@ import type { ExpenseWrite } from '@/lib/expenses/schema'
 import { draftLedgerRow } from '@/lib/expenses/optimistic'
 import type { CategoryOption, ExpenseBucket, LedgerRow, VehicleOption } from '@/lib/expenses/types'
 import { formatAmount, parseAmount, parsedAmountHint } from '@/lib/money'
+import type { AttachmentDraft, AttachmentView } from '@/lib/attachments/types'
+
+/**
+ * The photo field carries `browser-image-compression` and the Supabase browser
+ * client behind it, and this form is mounted inside the quick-add sheet on every
+ * route with a FAB. Loaded here it is a separate chunk that arrives when the
+ * More disclosure opens, not weight on `/today` for somebody who never attaches
+ * a photograph.
+ */
+const AttachmentField = dynamic(
+  () => import('@/components/attachments/attachment-field').then((module) => module.AttachmentField),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-2">
+        <p className="text-label text-ink-muted">Photos</p>
+        <div className="h-touch rounded-md bg-surface-sunken" />
+      </div>
+    ),
+  },
+)
 
 export type ExpenseFormProps = {
   mode: 'create' | 'edit'
@@ -36,6 +58,10 @@ export type ExpenseFormProps = {
   /** Above this the form offers to spread the cost. Null means never offer. */
   amortiseThreshold: number | null
   today: IsoDate
+  /** Whose storage folder uploads go into. From the session, never the client. */
+  userId: string
+  /** The photos already on this expense, signed. Empty on a new one. */
+  initialAttachments?: readonly AttachmentView[]
   onDone: () => void
 }
 
@@ -108,10 +134,22 @@ export function ExpenseForm({
   locale,
   amortiseThreshold,
   today,
+  userId,
+  initialAttachments,
   onDone,
 }: ExpenseFormProps) {
   const store = useExpenseStore()
   const [formError, setFormError] = useState<string | null>(null)
+
+  const [attachments, setAttachments] = useState<AttachmentDraft[]>(
+    () => (initialAttachments ?? []).map(({ url: _url, ...draft }) => draft),
+  )
+  /** Signed URLs for the ones that came from the server. Fixed for this sheet. */
+  const attachmentUrls = useMemo(() => {
+    const map: Record<string, string | null> = {}
+    for (const view of initialAttachments ?? []) map[view.id] = view.url
+    return map
+  }, [initialAttachments])
 
   const { register, handleSubmit, watch, setValue, formState } = useForm<Values>({
     defaultValues: defaults(initial, categories, today, locale),
@@ -284,11 +322,13 @@ export function ExpenseForm({
       category,
       vehicle,
       createdAt: initial?.created_at ?? new Date().toISOString(),
-      attachmentCount: initial?.attachment_count ?? 0,
+      attachmentCount: attachments.length,
     })
 
     const perform = (): Promise<ActionResult> =>
-      mode === 'create' ? createExpenseAction(write) : updateExpenseAction(write)
+      mode === 'create'
+        ? createExpenseAction(write, attachments)
+        : updateExpenseAction(write, attachments)
 
     store.run({ kind: 'save', row, previous: initial ?? null }, perform)
     onDone()
@@ -461,15 +501,21 @@ export function ExpenseForm({
               </Field>
             ) : null}
 
-            <Field label="Photos" hint="Photo upload arrives with the timeline in Phase 4.">
-              <button
-                type="button"
-                disabled
-                className={`${INPUT_CLASS} flex items-center text-ink-faint`}
-              >
-                Add photos
-              </button>
-            </Field>
+            {/* Mounted only once More is open, so the compression library is
+                fetched by somebody who might actually use it. */}
+            {moreOpen ? (
+              <AttachmentField
+                userId={userId}
+                vehicleId={values.vehicleId || null}
+                owner="expense"
+                value={attachments}
+                onChange={setAttachments}
+                urls={attachmentUrls}
+                context={
+                  values.merchant.trim() || category?.name || 'this expense'
+                }
+              />
+            ) : null}
           </div>
         </details>
       </div>

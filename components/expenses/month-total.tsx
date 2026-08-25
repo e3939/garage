@@ -3,7 +3,7 @@
 
 import { useExpenseStore } from '@/components/expenses/expense-store'
 import { Total } from '@/components/totals/total'
-import { monthLabel, type IsoDate } from '@/lib/dates'
+import type { IsoDate } from '@/lib/dates'
 import { pendingMonthDelta } from '@/lib/expenses/optimistic'
 import {
   SPEND_VIEW_DESCRIPTION,
@@ -16,6 +16,15 @@ import {
 type MonthTotalProps = {
   /** First of the month. */
   month: IsoDate
+  /**
+   * "August 2026", formatted on the server.
+   *
+   * Turning a date into words needs a locale's worth of month names, and this
+   * component is otherwise pure arithmetic — so the words are handed to it the
+   * same way icons are, rather than pulling date-fns into the bundle of every
+   * screen that shows a total. See `lib/dates-display.ts`.
+   */
+  monthContext: string
   /** All three figures, computed by `v_month_totals`. */
   totals: MonthViewTotals
   /** Which one is on screen. From the URL, falling back to the profile. */
@@ -36,14 +45,21 @@ type MonthTotalProps = {
  * The label is not decoration. The same expenses produce three different
  * figures, and a figure without its view named is a number nobody can act on.
  */
-export function MonthTotal({ month, totals, view, currency, locale }: MonthTotalProps) {
+export function MonthTotal({
+  month,
+  monthContext,
+  totals,
+  view,
+  currency,
+  locale,
+}: MonthTotalProps) {
   const { pending } = useExpenseStore()
   const total = totalForView(totals, view) + pendingMonthDelta(pending, month, currency, view)
 
   return (
     <Total
       view={SPEND_VIEW_LABEL[view]}
-      context={monthLabel(month)}
+      context={monthContext}
       emphasis="hero"
       amount={total}
       currency={currency}
