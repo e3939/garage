@@ -117,9 +117,13 @@ const PAIRS = [
   ['--text-muted', '--bg', BODY, 'secondary text on the app background'],
   ['--text-muted', '--surface', BODY, 'secondary text on a card'],
   ['--text-muted', '--surface-sunken', BODY, 'a caption on the odometer bed'],
-  // Tertiary text is placeholders and em dashes: never load-bearing, but it is
-  // still words, so it is held to the large-text floor rather than to nothing.
-  ['--text-faint', '--surface', UI, 'placeholder text on a card'],
+  // Tertiary is words too — a column count, a unit, the description under a
+  // heading — and it is set at 12px, so it is held to the body floor on all
+  // three surfaces rather than to something softer. A Lighthouse run is what
+  // settled that argument; see the note on `--text-faint` in globals.css.
+  ['--text-faint', '--bg', BODY, 'tertiary text on the app background'],
+  ['--text-faint', '--surface', BODY, 'tertiary text on a card'],
+  ['--text-faint', '--surface-sunken', BODY, 'tertiary text on the odometer bed'],
 
   // States, as words.
   ['--accent', '--bg', BODY, 'a link or a text action'],

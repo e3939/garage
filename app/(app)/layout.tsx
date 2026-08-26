@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { ExpenseStoreProvider } from '@/components/expenses/expense-store'
 import { BottomNav } from '@/components/shell/bottom-nav'
 import { ToastProvider } from '@/components/ui/toast'
-import { createClient } from '@/lib/supabase/server'
+import { currentUser } from '@/lib/queries/session'
 
 type AppLayoutProps = {
   children: ReactNode
@@ -19,10 +19,10 @@ type AppLayoutProps = {
  * a request and a matcher typo would silently open every page underneath.
  */
 export default async function AppLayout({ children, header, fab }: AppLayoutProps) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // Memoised for this request, so a page asking the same question later in the
+  // same render does not pay for a second round trip to the auth API. See
+  // `lib/queries/session.ts`.
+  const user = await currentUser()
 
   if (!user) redirect('/sign-in')
 

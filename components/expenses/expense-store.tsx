@@ -4,7 +4,6 @@
 import {
   createContext,
   startTransition,
-  useCallback,
   useContext,
   useMemo,
   useOptimistic,
@@ -58,20 +57,40 @@ export function ExpenseStoreProvider({ children }: { children: ReactNode }) {
   )
   const { show } = useToast()
 
-  const run = useCallback<ExpenseStore['run']>(
-    (op, perform, undo) => {
+  /**
+   * Named so it can offer itself as the Retry.
+   *
+   * A write that does not reach the server is the failure this app is most
+   * likely to meet — a phone in a car park, a lift, a tunnel — and it used to
+   * end with a toast naming an exception and the typed expense gone. Now the
+   * toast offers to send it again, and the closure it re-runs still holds the
+   * whole write and its photographs, so a retry costs one tap and no retyping.
+   *
+   * A thrown error is treated as a failure rather than allowed to escape.
+   * `fetch` rejects on a dropped connection, and an unhandled rejection inside a
+   * transition takes the screen to the error boundary — which is a heavy answer
+   * to "the network blinked" and loses the form as well.
+   */
+  const run = useMemo<ExpenseStore['run']>(() => {
+    return function attempt(op, perform, undo) {
       startTransition(async () => {
         enqueue(op)
-        const result = await perform()
+
+        let result: ActionResult
+        try {
+          result = await perform()
+        } catch {
+          result = { ok: false, error: 'That did not reach the server' }
+        }
+
         if (result.ok) {
           if (undo) show(undo.message, { label: undo.label, run: undo.run })
         } else {
-          show(result.error)
+          show(result.error, { label: 'Retry', run: () => attempt(op, perform, undo) })
         }
       })
-    },
-    [enqueue, show],
-  )
+    }
+  }, [enqueue, show])
 
   const value = useMemo<ExpenseStore>(() => ({ pending, run }), [pending, run])
 

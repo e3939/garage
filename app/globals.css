@@ -35,7 +35,21 @@
     --border-strong: var(--rule-strong);
     --text: var(--ink);
     --text-muted: var(--ink-soft);
-    --text-faint: var(--ink-faint);
+    /* Not `var(--ink-faint)`, for the same reason `--positive` is not
+       `var(--fire-green)`: the ramp is what the document draws, the semantic
+       token is what carries words.
+
+       `--ink-faint` is #9A9084, which is 2.63:1 against the odometer bed at
+       12px — and tertiary is not decoration here, it is the count on a board
+       column, the unit under a figure and the description under a heading. A
+       Lighthouse run named exactly those elements. This is the same hue and
+       saturation taken down until it clears 4.5:1 on all three surfaces.
+
+       It lands close to `--text-muted`, and that is not an accident that can be
+       tuned away: on a #F2EBD9 panel, nothing lighter than about this clears the
+       floor for small text. The three-step ink ramp survives as two and a half.
+       See AUTOPILOT-NOTES.md. */
+    --text-faint: #72685d;
     --accent: var(--fire-brick);
     --accent-ink: #fffdf7;
     /* Not `var(--fire-green)`, and this is the one place the semantic layer
@@ -159,6 +173,8 @@
       --ink: #f2ebd9;
       --ink-soft: #b5ab98;
       --ink-faint: #8d8474;
+      /* Lifted rather than lowered, and for the same reason as the light one. */
+      --text-faint: #958d7e;
 
       /* docs/03-DESIGN.md names #C4633F here. That is 3.73:1 as text on
          `--surface`, and the accent is text as often as it is a fill — every

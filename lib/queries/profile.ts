@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
+import { currentUser } from '@/lib/queries/session'
 import { DEFAULT_CURRENCY, DEFAULT_LOCALE } from '@/lib/money'
 import { APP_TIMEZONE } from '@/lib/dates'
 import { DEFAULT_SPEND_VIEW, parseSpendView, type SpendView } from '@/lib/views'
@@ -52,9 +53,5 @@ export async function fetchProfilePreferences(): Promise<ProfilePreferences> {
  * than from anything the client sent.
  */
 export async function fetchUserId(): Promise<string | null> {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return user?.id ?? null
+  return (await currentUser())?.id ?? null
 }

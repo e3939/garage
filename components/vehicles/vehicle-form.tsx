@@ -245,6 +245,7 @@ export function VehicleForm({
       <HeroPhotoField
         userId={userId}
         vehicleId={vehicleId}
+        nickname={values.nickname}
         value={heroPath}
         initialUrl={heroUrl}
         onChange={setHeroPath}

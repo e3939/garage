@@ -13,6 +13,11 @@ import {
   type ActionResult,
 } from '@/app/(app)/expenses/actions'
 import { AmortiseField } from '@/components/expenses/amortise-field'
+import {
+  clearExpenseDraft,
+  readExpenseDraft,
+  writeExpenseDraft,
+} from '@/components/expenses/expense-draft'
 import { CategoryChips } from '@/components/expenses/category-chips'
 import { ImpactControl } from '@/components/expenses/impact-control'
 import { useExpenseStore } from '@/components/expenses/expense-store'
@@ -94,7 +99,7 @@ export type ExpenseFormProps = {
   onDone: () => void
 }
 
-type Values = {
+export type ExpenseFormValues = {
   amountText: string
   categoryId: string
   occurredOn: string
@@ -115,7 +120,7 @@ function defaults(
   locale: string,
   currency: string,
   prefill?: ExpensePrefill,
-): Values {
+): ExpenseFormValues {
   if (!initial) {
     return {
       amountText:
@@ -189,8 +194,20 @@ export function ExpenseForm({
     return map
   }, [initialAttachments])
 
-  const { register, handleSubmit, watch, setValue, formState } = useForm<Values>({
-    defaultValues: defaults(initial, categories, today, locale, currency, prefill),
+  /**
+   * A create with nothing pre-filled opens on whatever was last typed and never
+   * confirmed by the server. See `expense-draft.ts` — the point is that the
+   * sheet closing, the request failing and the tab going away are three
+   * different events and only the first of them is normal.
+   *
+   * Read once, in the initialiser, so it cannot fight what is being typed.
+   */
+  const [restored] = useState<ExpenseFormValues | null>(() =>
+    mode === 'create' && !initial && !prefill ? readExpenseDraft() : null,
+  )
+
+  const { register, handleSubmit, watch, setValue, formState } = useForm<ExpenseFormValues>({
+    defaultValues: restored ?? defaults(initial, categories, today, locale, currency, prefill),
   })
 
   // An expense that carries an override is one where the category's own answer
@@ -213,6 +230,15 @@ export function ExpenseForm({
   const [impactOpen, setImpactOpen] = useState(overridden)
 
   const values = watch()
+
+  // Written as it is typed, and cleared by the server's confirmation rather than
+  // by this form closing. An edit is never kept: it has a row on the server to
+  // fall back on, and restoring a half-typed edit over a real expense would lose
+  // more than it saved.
+  useEffect(() => {
+    if (mode !== 'create' || initial || prefill) return
+    writeExpenseDraft(values)
+  }, [mode, initial, prefill, values])
 
   const amountRef = useRef<HTMLInputElement | null>(null)
   const amountField = register('amountText')
@@ -378,10 +404,18 @@ export function ExpenseForm({
       attachmentCount: attachments.length,
     })
 
-    const perform = (): Promise<ActionResult> =>
-      mode === 'create'
-        ? createExpenseAction(write, attachments)
-        : updateExpenseAction(write, attachments)
+    const perform = async (): Promise<ActionResult> => {
+      const result =
+        mode === 'create'
+          ? await createExpenseAction(write, attachments)
+          : await updateExpenseAction(write, attachments)
+
+      // The draft goes when the server says the expense exists, and not before.
+      // A failed save leaves it where it is, so the Retry in the toast is the
+      // fast path back and reopening the sheet is the slow one.
+      if (result.ok && mode === 'create') clearExpenseDraft()
+      return result
+    }
 
     store.run({ kind: 'save', row, previous: initial ?? null }, perform)
     onDone()

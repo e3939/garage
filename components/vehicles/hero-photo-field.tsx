@@ -23,6 +23,8 @@ type Stage = 'idle' | 'compressing' | 'uploading' | 'error'
 type HeroPhotoFieldProps = {
   userId: string
   vehicleId: string
+  /** What the car is called, for the preview's alt text. Empty on a new one. */
+  nickname?: string
   /** The stored path, or null. Owned by the form; this only proposes changes. */
   value: string | null
   /** A signed URL for `value` when it came from the server. */
@@ -51,6 +53,7 @@ type HeroPhotoFieldProps = {
 export function HeroPhotoField({
   userId,
   vehicleId,
+  nickname,
   value,
   initialUrl,
   onChange,
@@ -176,7 +179,11 @@ export function HeroPhotoField({
              tab. There is nothing for the image optimiser to fetch and
              next/image cannot serve one, so this is a plain img on purpose. */
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={preview} alt="" className="size-full object-cover" />
+          <img
+            src={preview}
+            alt={nickname?.trim() ? `Hero photo of ${nickname.trim()}` : 'The photo chosen for this car'}
+            className="size-full object-cover"
+          />
         ) : (
           <span className="absolute inset-0 flex items-center justify-center px-4 text-center text-caption text-ink-muted">
             No photo yet. One good three-quarter shot is worth more than five.

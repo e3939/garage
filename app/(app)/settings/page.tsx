@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
-import { createClient } from '@/lib/supabase/server'
+import { currentUser } from '@/lib/queries/session'
 
 export const metadata: Metadata = { title: 'Settings' }
 
@@ -25,10 +25,8 @@ const ROWS = [
 ] as const
 
 export default async function SettingsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // The layout has already asked; this is the same answer, memoised.
+  const user = await currentUser()
 
   return (
     <section className="space-y-6">
