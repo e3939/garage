@@ -24,7 +24,7 @@ PHASES=(
   # "04-vehicles"
   # "05-timeline"
   # "06-mod-planner"
-  "07-car-records"
+  # "07-car-records"
   "08-money-tools"
   "09-polish"
   "10-import-export"
