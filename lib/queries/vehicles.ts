@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { cache } from 'react'
+
 import { createClient } from '@/lib/supabase/server'
 import type { VehicleOption } from '@/lib/expenses/types'
 import type { Vehicle, VehicleClosing, VehicleTotals } from '@/lib/vehicles/types'
@@ -35,8 +37,15 @@ const VEHICLE_COLUMNS = [
 /**
  * The vehicles an expense may be attached to: owned, not archived, in the order
  * the garage shows them.
+ *
+ * Wrapped in React's `cache()` so the page and the shell's FAB slot — which
+ * render as siblings and both need this — cost one round trip between them
+ * rather than two. The memo is scoped to a single request, which is exactly
+ * how long this answer is good for; see `lib/queries/session.ts`.
  */
-export async function fetchVehicleOptions(): Promise<VehicleOption[]> {
+export const fetchVehicleOptions = cache(async function fetchVehicleOptions(): Promise<
+  VehicleOption[]
+> {
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -49,7 +58,7 @@ export async function fetchVehicleOptions(): Promise<VehicleOption[]> {
 
   if (error) throw new Error(`vehicles failed: ${error.message}`)
   return data ?? []
-}
+})
 
 /**
  * The garage. Archived vehicles are excluded by default — selling or retiring a

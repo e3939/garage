@@ -3113,3 +3113,183 @@ looks like from the inside:
    JavaScript and nine parallel queries, and it is the screen this app is for. Nothing about it
    is wrong, but it is the only route within striking distance of the 40KB ceiling, and the
    before/after slider plus the build log are what put it there.
+
+---
+
+## Production triage — slow, unreliable, and the wrong currency glyph
+
+Not a phase. Written 27 August 2026, after the first real use of the deployed app on a phone.
+
+### The symptoms, and what actually caused them
+
+Three separate faults, reported as one. They are worth separating because only one
+of them was the thing making the app *fail*, and it was not the one that looked like it.
+
+**1. Every interaction lagging 1 to 1.5 seconds — the region.**
+
+There is no `vercel.json` in the repository and no `preferredRegion` export anywhere, so the
+functions run in whatever the Vercel project's dashboard default is. Supabase is in
+Singapore. If those two are not the same place, every one of the round trips counted below is
+a trans-Pacific one, and a page making nine of them in two waves cannot be fast no matter how
+the application code is written.
+
+`vercel.json` now pins `"regions": ["sin1"]`.
+
+**This is the one number I could not verify from here.** The deployment URL discoverable
+through the GitHub deployments API is behind Vercel's SSO protection, so an anonymous request
+gets a redirect from the edge rather than a function invocation, and the `x-vercel-id` header
+therefore reports the edge POP (`hkg1`) rather than the compute region. What to check, in one
+step, is in the report below.
+
+**2. The error card on first load — a transient JWT rejection, with nothing to catch it.**
+
+The Vercel log gave the actual failure, and it is not a logic bug:
+
+```
+Error: v_amortise_suggestion failed: JWT issued at future
+```
+
+That is PostgREST refusing an access token whose `iat` claim is ahead of PostgREST's own
+clock. It comes from clock skew between the service that mints a token and the service that
+checks it, it is measured in fractions of a second, and it clears on its own. Nothing in this
+application can prevent it.
+
+What this application *could* do, and did not, is survive it. There was no retry anywhere on
+the server data path, and no timeout either — no `global.fetch` override on the Supabase
+client, nothing wrapping the query helpers. One transient rejection was one error card.
+
+**3. Two error cards on one screen — the same query, fetched twice.**
+
+The two log lines are the same error from two different chunks, which means two separate
+render trees. `fetchAmortiseThreshold()` is called by `/today` **and** by the shell's `@fab`
+slot, which is a sibling of the page and renders in parallel with it. Two calls, two
+independent failures, two boundaries, two cards.
+
+It was not the only duplicate. Measured by proxying the local stack and tallying what one
+server render asks for:
+
+| Route | Round trips before | Duplicated between page and `@fab` slot |
+|---|---|---|
+| `/today` | 13 | `v_categories_ranked`, `vehicles`, `profiles`, `v_amortise_suggestion` |
+| `/ledger` | 11 | the same four |
+| `/garage` | 8 | `vehicles`, `profiles` |
+| `/money` | 14 | `profiles`, `v_categories_ranked`, `vehicles` |
+
+**4. The unstyled crash before the last merge — a real gap between the boundaries.**
+
+`app/(app)/error.tsx` covers pages inside the shell. A boundary never catches its own
+segment's layout, so a failure in `app/(app)/layout.tsx` — which is where the session is
+checked, and therefore exactly where a transient auth failure lands — skipped past it and fell
+through to `app/global-error.tsx`. That one replaces `<html>` and `<body>` entirely, so the
+fonts and tokens are gone. There was no `app/error.tsx` in between.
+
+**5. The dong sign in the wrong face — a subset that has been silently failing since Phase 0.**
+
+Phase 0 assumption 5 said the mono subset contains no letters. The real problem is narrower
+and worse. `scripts/subset-mono.mjs` cut from
+`@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2`, and its
+range list has asked for `[0x20a1, 0x20bf]` — commented "includes the dong sign U+20AB" —
+since the beginning. Fontsource splits this family by unicode range the way Google Fonts
+does, and **U+20AB is not in the `latin` file.** Subsetting silently drops a character the
+source does not have, so the request was never honoured and no error was ever raised.
+
+Verified by probing each source file:
+
+| Source | U+20AB `₫` | U+0111 `đ` |
+|---|---|---|
+| `latin` (what the script used) | **missing** | missing |
+| `latin-ext` | present | present |
+| `vietnamese` | present | present |
+
+Every amount in the app was rendering its digits in JetBrains Mono and its currency mark in
+whatever the fallback stack resolved — a different face at a different width, on every screen
+that shows money.
+
+### What was changed
+
+**`lib/supabase/fetch.ts`** — new. A `global.fetch` for both server Supabase clients, adding
+an 8-second timeout and exactly one retry. Verified against a local server that fails in a
+chosen way on the first attempt:
+
+| Scenario | Attempts | Result |
+|---|---|---|
+| `JWT issued at future` on a GET | 2 | 200 |
+| `JWT issued at future` on a POST | 2 | 200 |
+| 503 on a GET | 2 | 200 |
+| 503 on a POST | **1** | 503, not retried |
+| A genuine 401 | **1** | 401, body intact |
+| No failure | 1 | 200, no overhead |
+
+The POST rows are the point. A retried write is a duplicate expense, so writes are not
+retried on a transient network or server failure — the request may well have landed. The one
+exception is the authentication rejection, which is safe for any method precisely because the
+request was refused at the gate and never reached the database.
+
+**`cache()` on the four reads both trees need** — `fetchProfilePreferences`,
+`fetchRankedCategories`, `fetchVehicleOptions`, `fetchAmortiseThreshold`. React's `cache()` is
+scoped to one request, which is exactly how long those answers are good for, and it is the
+same mechanism `lib/queries/session.ts` already used for `currentUser()`.
+
+| Route | Before | After | Removed |
+|---|---|---|---|
+| `/today` | 13 | **9** | 4 |
+| `/ledger` | 11 | **7** | 4 |
+| `/garage` | 8 | **7** | 1 |
+| `/money` | 14 | **11** | 3 |
+
+`/today` now issues `v_amortise_suggestion` once rather than twice, so the two-error-card
+symptom cannot recur even when the underlying failure does.
+
+**`app/error.tsx`** — new, between the root layout and the route group, so a failure in
+`app/(app)/layout.tsx` renders as a styled screen with the stylesheet still attached.
+`global-error.tsx` stays as the last resort for the root layout itself.
+
+**`vercel.json`** — `"regions": ["sin1"]`.
+
+**`scripts/subset-mono.mjs`** — two outputs. Digits and punctuation from `latin` as before;
+`₫` and `đ` from `vietnamese`, 1.3KB. And a guard: every character the script asks for is now
+verified present in the output and the build throws if one is not, so this cannot fail
+silently again.
+
+### Assumptions
+
+1. **The Vercel functions are not currently in Singapore.** Inferred from the absence of any
+   region setting, not observed. If the dashboard already says Singapore, `vercel.json` is a
+   no-op that documents the requirement, and the latency has a different cause — say so and I
+   will look again.
+2. **The JWT skew is Supabase-side and transient.** The retry treats it as such. If it turns
+   out to be persistent, the retry converts a hard failure into a doubled latency, which would
+   show up as slowness rather than errors.
+3. **8 seconds is the right timeout.** Long enough that a genuinely slow query on a bad
+   connection completes, short enough that a stalled connection fails a panel instead of the
+   page. Not tuned against production data.
+4. **The `@fab` slot is left blocking.** With the duplicates removed it costs `/today` and
+   `/ledger` nothing at all, and one query on `/money` and `/garage`. Streaming it behind a
+   Suspense boundary would mean the FAB appearing after the page, which is worse than one
+   query. Revisit if the region fix does not land the numbers.
+5. **`fetchProfilePreferences` still swallows its errors** and returns the schema defaults.
+   That is deliberate and unchanged — but it means a transient failure there shows as the
+   wrong currency rather than as an error, and it will not appear in any log. Worth knowing.
+
+### What could not be verified without the real thing
+
+- **The function region**, per assumption 1.
+- **Any production timing.** Every number above is a count of round trips, measured locally
+  through a proxy in front of the local stack. Counts are exact and they are what multiplies
+  by the region round trip. The wall-clock numbers from the local run (roughly 200ms a route)
+  say nothing about production, because the database was three milliseconds away.
+- **That the JWT error stops appearing.** It is intermittent and Supabase-side; only a day of
+  real use will tell.
+- **The dong sign on an actual iPhone.** Verified in a desktop browser by measuring the glyph
+  against each candidate family: `₫` now resolves to the real JetBrains face at the same
+  advance width as its digits, where before it resolved to the system monospace.
+
+### What a reviewer should check first
+
+1. **The region**, before anything else. Vercel dashboard, Settings, Functions — the region
+   should read Singapore. It is the only change here that can account for whole seconds.
+2. **First load of each tab**, twice, from a cold start. The error card should be gone. If it
+   is not, the digest on the card maps to a Vercel log line.
+3. **Any amount, anywhere.** The `₫` should now sit at the same width as the digits before it.
+4. **A write on a bad connection.** Log an expense with the connection throttled, and confirm
+   one expense appears rather than two.

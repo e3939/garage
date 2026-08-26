@@ -76,7 +76,11 @@
     /* --- Typography. Faces come from next/font in app/fonts.ts. */
     --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
     --font-body: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
-    --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+    /* Two faces, one stack. The symbols face is first and holds exactly one
+       glyph, `₫`; everything else falls through to the digits face and its
+       fallbacks. Reversing these two puts a system monospace in front of the
+       dong sign and the bug comes back. See app/fonts.ts. */
+    --font-mono: var(--font-jetbrains-mono-symbols), var(--font-jetbrains-mono);
 
     /* Scale. Two entries change between mobile and desktop; the media query
        below moves the variable so one utility class covers both. */

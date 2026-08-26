@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { cache } from 'react'
+
 import { createClient } from '@/lib/supabase/server'
 import { currentUser } from '@/lib/queries/session'
 import { DEFAULT_CURRENCY, DEFAULT_LOCALE } from '@/lib/money'
@@ -27,8 +29,13 @@ const FALLBACK: ProfilePreferences = {
  * Preferences, with the schema defaults as a fallback. A profile row is created
  * by trigger on sign-up, so its absence means something is wrong upstream —
  * but the expense form should still open.
+ *
+ * Wrapped in React's `cache()` so the page and the shell's FAB slot — which
+ * render as siblings and both need this — cost one round trip between them
+ * rather than two. The memo is scoped to a single request, which is exactly
+ * how long this answer is good for; see `lib/queries/session.ts`.
  */
-export async function fetchProfilePreferences(): Promise<ProfilePreferences> {
+export const fetchProfilePreferences = cache(async function fetchProfilePreferences(): Promise<ProfilePreferences> {
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -45,7 +52,7 @@ export async function fetchProfilePreferences(): Promise<ProfilePreferences> {
     amortiseSuggestMultiplier: Number(data.amortise_suggest_multiplier ?? FALLBACK.amortiseSuggestMultiplier),
     defaultView: parseSpendView(data.default_view, FALLBACK.defaultView),
   }
-}
+})
 
 /**
  * The signed-in user's id. Not a secret — it is the first segment of every

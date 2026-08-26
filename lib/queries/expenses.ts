@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { cache } from 'react'
+
 import { createClient } from '@/lib/supabase/server'
 import type { LedgerCursor, LedgerRow } from '@/lib/expenses/types'
 import type { LedgerFilters } from '@/lib/expenses/filters'
@@ -114,8 +116,15 @@ export function monthTotalsFrom(row: Partial<Record<keyof MonthViewTotals, numbe
  * The amount above which the form offers to spread a cost over months: the
  * median of the last 90 days times the profile's multiplier. Null when there is
  * not enough history to take a median of, and the form then stays quiet.
+ *
+ * Wrapped in React's `cache()` so the page and the shell's FAB slot — which
+ * render as siblings and both need this — cost one round trip between them
+ * rather than two. The memo is scoped to a single request, which is exactly
+ * how long this answer is good for; see `lib/queries/session.ts`.
  */
-export async function fetchAmortiseThreshold(): Promise<number | null> {
+export const fetchAmortiseThreshold = cache(async function fetchAmortiseThreshold(): Promise<
+  number | null
+> {
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -125,4 +134,4 @@ export async function fetchAmortiseThreshold(): Promise<number | null> {
 
   if (error) throw new Error(`v_amortise_suggestion failed: ${error.message}`)
   return data?.threshold ?? null
-}
+})

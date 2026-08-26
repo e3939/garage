@@ -57,8 +57,37 @@ export const jetbrainsMono = localFont({
   fallback: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
 })
 
+/**
+ * Data, continued — the dong sign and the letter it is built from.
+ *
+ * Fontsource splits this family by unicode range the way Google Fonts does, and
+ * U+20AB is not in the `latin` file the digits come from. It cannot be subset in
+ * from there, so it is a second face cut from `vietnamese`, and the two are
+ * stacked in `--font-mono`. CSS resolves a font stack per character, so a VND
+ * amount takes its digits from one file and its `₫` from the other.
+ *
+ * This face goes FIRST in that stack, and carries neither a `fallback` list nor
+ * an adjusted fallback. Both of those would be emitted as extra families
+ * between the two real ones — and a system monospace does have a dong sign, so
+ * it would answer for `₫` and the second file would never be reached. Ordering
+ * it first, bare, means the only character it can claim is one it actually has;
+ * everything else falls straight through to the digits face, which keeps its
+ * size-adjusted fallback because that is where a swap would be seen.
+ *
+ * 1.3KB, on screen wherever money is.
+ */
+export const jetbrainsMonoSymbols = localFont({
+  src: './fonts/jetbrains-mono-symbols.woff2',
+  weight: '100 800',
+  style: 'normal',
+  display: 'swap',
+  variable: '--font-jetbrains-mono-symbols',
+  adjustFontFallback: false,
+})
+
 export const fontVariables = [
   archivo.variable,
   interTight.variable,
   jetbrainsMono.variable,
+  jetbrainsMonoSymbols.variable,
 ].join(' ')

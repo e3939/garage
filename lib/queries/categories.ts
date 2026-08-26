@@ -1,5 +1,7 @@
 import 'server-only'
 
+import { cache } from 'react'
+
 import { createClient } from '@/lib/supabase/server'
 import type { CategoryOption } from '@/lib/expenses/types'
 
@@ -10,8 +12,15 @@ import type { CategoryOption } from '@/lib/expenses/types'
  * The ranking is `v_categories_ranked`, so "most used" is decided by Postgres
  * counting rows rather than by the browser sorting an array it had to download
  * first (CLAUDE.md section 3).
+ *
+ * Wrapped in React's `cache()` so the page and the shell's FAB slot — which
+ * render as siblings and both need this — cost one round trip between them
+ * rather than two. The memo is scoped to a single request, which is exactly
+ * how long this answer is good for; see `lib/queries/session.ts`.
  */
-export async function fetchRankedCategories(includeArchived = false): Promise<CategoryOption[]> {
+export const fetchRankedCategories = cache(async function fetchRankedCategories(
+  includeArchived = false,
+): Promise<CategoryOption[]> {
   const supabase = await createClient()
 
   let query = supabase
@@ -50,7 +59,7 @@ export async function fetchRankedCategories(includeArchived = false): Promise<Ca
       } satisfies CategoryOption,
     ]
   })
-}
+})
 
 /** Settings orders by hand, not by usage: the list should not move under you. */
 export async function fetchCategoriesForSettings(): Promise<CategoryOption[]> {

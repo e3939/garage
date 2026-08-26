@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { env } from '@/lib/env'
+import { createSupabaseFetch } from '@/lib/supabase/fetch'
 import type { Database } from '@/lib/supabase/types'
 
 /** Routes reachable without a session. Everything else redirects to sign-in. */
@@ -26,6 +27,7 @@ export async function updateSession(request: NextRequest) {
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     {
+      global: { fetch: createSupabaseFetch() },
       cookies: {
         getAll() {
           return request.cookies.getAll()
