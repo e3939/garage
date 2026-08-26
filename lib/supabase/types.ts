@@ -379,6 +379,13 @@ export type Database = {
             foreignKeyName: "expenses_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "expenses_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "v_vehicle_totals"
             referencedColumns: ["vehicle_id"]
           },
@@ -467,6 +474,13 @@ export type Database = {
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "v_fuel_summary"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "fuel_logs_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
             referencedColumns: ["vehicle_id"]
           },
           {
@@ -599,6 +613,13 @@ export type Database = {
             foreignKeyName: "funds_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "funds_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "v_vehicle_totals"
             referencedColumns: ["vehicle_id"]
           },
@@ -654,6 +675,13 @@ export type Database = {
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "v_fuel_summary"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "milestones_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
             referencedColumns: ["vehicle_id"]
           },
           {
@@ -786,6 +814,13 @@ export type Database = {
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "v_fuel_summary"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "mod_plans_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
             referencedColumns: ["vehicle_id"]
           },
           {
@@ -927,6 +962,13 @@ export type Database = {
             foreignKeyName: "parts_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "parts_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "v_vehicle_totals"
             referencedColumns: ["vehicle_id"]
           },
@@ -1062,6 +1104,13 @@ export type Database = {
             foreignKeyName: "recurring_expenses_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "recurring_expenses_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "v_vehicle_totals"
             referencedColumns: ["vehicle_id"]
           },
@@ -1164,6 +1213,13 @@ export type Database = {
             foreignKeyName: "service_records_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "service_records_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "v_vehicle_totals"
             referencedColumns: ["vehicle_id"]
           },
@@ -1231,6 +1287,13 @@ export type Database = {
             foreignKeyName: "service_schedules_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "service_schedules_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "v_vehicle_totals"
             referencedColumns: ["vehicle_id"]
           },
@@ -1283,6 +1346,13 @@ export type Database = {
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "v_fuel_summary"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "timeline_notes_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
             referencedColumns: ["vehicle_id"]
           },
           {
@@ -1545,6 +1615,13 @@ export type Database = {
             foreignKeyName: "expenses_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "expenses_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "v_vehicle_totals"
             referencedColumns: ["vehicle_id"]
           },
@@ -1594,6 +1671,13 @@ export type Database = {
             foreignKeyName: "expenses_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "expenses_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "v_vehicle_totals"
             referencedColumns: ["vehicle_id"]
           },
@@ -1632,6 +1716,13 @@ export type Database = {
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "v_fuel_summary"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "fuel_logs_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
             referencedColumns: ["vehicle_id"]
           },
           {
@@ -1722,6 +1813,13 @@ export type Database = {
             foreignKeyName: "funds_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "funds_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "v_vehicle_totals"
             referencedColumns: ["vehicle_id"]
           },
@@ -1753,6 +1851,13 @@ export type Database = {
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "v_fuel_summary"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "mod_plans_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
             referencedColumns: ["vehicle_id"]
           },
           {
@@ -1792,6 +1897,13 @@ export type Database = {
             columns: ["vehicle_id"]
             isOneToOne: false
             referencedRelation: "v_fuel_summary"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "mod_plans_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
             referencedColumns: ["vehicle_id"]
           },
           {
@@ -1872,6 +1984,13 @@ export type Database = {
             foreignKeyName: "service_schedules_vehicle_id_fkey"
             columns: ["vehicle_id"]
             isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "service_schedules_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
             referencedRelation: "v_vehicle_totals"
             referencedColumns: ["vehicle_id"]
           },
@@ -1895,6 +2014,34 @@ export type Database = {
           stamp: string | null
           subtitle: string | null
           title: string | null
+          user_id: string | null
+          vehicle_id: string | null
+        }
+        Relationships: []
+      }
+      v_vehicle_closing: {
+        Row: {
+          archived_at: string | null
+          cost_per_km: number | null
+          currency: string | null
+          expense_count: number | null
+          fill_ups: number | null
+          km_driven: number | null
+          mods_installed: number | null
+          months_owned: number | null
+          net_cost: number | null
+          net_cost_per_km: number | null
+          nickname: string | null
+          project_spend: number | null
+          purchase_date: string | null
+          purchase_price: number | null
+          running_spend: number | null
+          services_done: number | null
+          sold_date: string | null
+          sold_price: number | null
+          status: Database["public"]["Enums"]["vehicle_status"] | null
+          total_invested: number | null
+          total_spend: number | null
           user_id: string | null
           vehicle_id: string | null
         }
@@ -1951,6 +2098,10 @@ export type Database = {
           recurring_id: string
           user_id: string
         }[]
+      }
+      import_expenses: {
+        Args: { p_categories?: Json; p_expenses?: Json }
+        Returns: Json
       }
       ledger_page: {
         Args: {

@@ -16,6 +16,8 @@ import { createClient } from '@/lib/supabase/server'
 import { forgetSignedUrl } from '@/lib/storage/signed-url'
 import {
   vehicleArchiveSchema,
+  vehicleIdSchema,
+  vehicleSellSchema,
   vehicleWriteSchema,
   type VehicleWrite,
 } from '@/lib/vehicles/schema'
@@ -171,5 +173,68 @@ export async function discardVehiclePhotoAction(rawPath: unknown): Promise<Actio
   if (error) return { ok: false, error: error.message }
 
   forgetSignedUrl('vehicles', rawPath)
+  return { ok: true }
+}
+
+/**
+ * Sold.
+ *
+ * Three columns and one archive, in one update: the date, the price, the status,
+ * and `archived_at` so the car leaves the garage and the expense form the way an
+ * archived car does. Nothing is deleted and nothing is recalculated — every
+ * expense the car earned stays exactly where it is, which is what makes the
+ * closing summary true.
+ *
+ * There is deliberately no expense written for the sale. A car sold for money is
+ * not a negative running cost — a part sold on is, and `parts` does exactly that
+ * — and folding a sale into the ledger would put a large negative row in a month
+ * and quietly flatter every figure that month carries. The sale lives on the
+ * vehicle, and `v_vehicle_closing` is where it is netted off.
+ */
+export async function sellVehicleAction(raw: unknown): Promise<ActionResult> {
+  const parsed = vehicleSellSchema.safeParse(raw)
+  if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) }
+
+  const supabase = await createClient()
+
+  // A price with no currency is a number nobody can read, so the two travel
+  // together as they do on the purchase side. With no price, the column is left
+  // exactly as the purchase set it rather than being overwritten.
+  const sale = {
+    status: 'sold' as const,
+    sold_date: parsed.data.sold_date,
+    sold_price: parsed.data.sold_price,
+    archived_at: new Date().toISOString(),
+  }
+
+  const { error } = await supabase
+    .from('vehicles')
+    .update(parsed.data.sold_price === null ? sale : { ...sale, currency: parsed.data.currency })
+    .eq('id', parsed.data.id)
+
+  if (error) return { ok: false, error: describe(error.message) }
+
+  revalidateVehicleScreens()
+  return { ok: true }
+}
+
+/**
+ * Sold by mistake, or bought back. Puts the car in the garage as it was and
+ * clears the sale, because a sale that did not happen should leave no trace —
+ * a `sold_date` on an owned car would sit in `months_owned` forever.
+ */
+export async function unsellVehicleAction(raw: unknown): Promise<ActionResult> {
+  const parsed = vehicleIdSchema.safeParse(raw)
+  if (!parsed.success) return { ok: false, error: 'Unknown vehicle' }
+
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('vehicles')
+    .update({ status: 'owned', sold_date: null, sold_price: null, archived_at: null })
+    .eq('id', parsed.data)
+
+  if (error) return { ok: false, error: describe(error.message) }
+
+  revalidateVehicleScreens()
   return { ok: true }
 }

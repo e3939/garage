@@ -2751,3 +2751,365 @@ it is one line in `app/fonts.ts`.
 7. **Re-run `npm run lighthouse` against the deployment**, not this machine, before deciding
    anything about the two paint budgets. The working is above; TTFB is most of the gap and
    this laptop is not Vercel.
+
+---
+
+## Phase 10 — Data ownership
+
+Branch: `feat/10-import-export` (the roadmap calls this Phase 9, "Data ownership"; the heading
+follows the branch number so the sections in this file stay in order, as in every phase
+before it). The last phase in `docs/04-ROADMAP.md`.
+
+### What was built
+
+- **An importer that shows you the file before it touches the ledger.** Choose a CSV and the
+  browser decodes it, detects the separator, maps the columns by name, and draws twenty rows
+  with every unreadable one outlined and told why. Under that is the dry run — "142 will
+  import, 6 will be skipped" with the reasons grouped and counted — and only then a button.
+  The file never leaves the device until that button; the only thing that crosses the network
+  is a list of expenses that have already been checked once, and the server checks them again
+  with the same zod schema the quick-add sheet uses.
+- **The commit is one transaction and cannot half-happen.** `import_expenses` in migration
+  0020 creates the categories the file named and inserts its expenses in a single function
+  call, because creating a category and then referencing it would otherwise be two PostgREST
+  requests with a window in between. `lib/queries/data-ownership.db.test.ts` proves it: a file
+  with one bad row in three imports none of the three, and the category it would have created
+  is not there afterwards either.
+- **Export is a list of files, not a wizard.** `/settings/export` shows every table with its
+  real row count and a link each; `garage.json` is all seventeen of them in one file with the
+  attachment manifest folded in; `attachments-manifest.csv` is one row per stored object with
+  a signed URL good for twenty-four hours. Every query runs as the signed-in user, so RLS
+  decides what "everything" means and there is no service key within reach of the endpoint.
+- **The closing summary.** Selling a car takes a date and a price and goes straight to
+  `/garage/[vehicleId]/sold`: the hero photo with a SOLD stamp on it, total owned cost as the
+  hero figure, then kilometres driven, cost per km, months owned and mods installed, then what
+  it went for and what it therefore cost. Every figure comes out of one new view,
+  `v_vehicle_closing`. The car archives; nothing is deleted; the page renders for a car you
+  still own too, which is how you can look at it before you decide.
+- **A script that runs the acceptance criterion.** `npm run verify:round-trip` seeds a ledger
+  full of what usually breaks a CSV — a comma, a quote, a line break inside a field, a
+  Vietnamese merchant name, a refund, an expense spread over six months — signs in against a
+  real production server exactly as a browser does, downloads the export, feeds it back
+  through the app's own decoder, parser, mapper and planner, commits it to a **second, empty
+  user**, exports that one, and compares the two files row by row. It imports the file twice
+  and checks the second time does nothing.
+
+### The acceptance criterion, with the working shown
+
+> "You can leave the app with all your data and come back with it intact."
+
+```
+$ npm run build && npm run verify:round-trip
+
+  ok  expenses.csv arrives as a download — attachment; filename="garage-expenses-2026-08-26.csv"
+  ok  expenses.csv carries a UTF-8 byte-order mark
+  ok  the manifest is a file too
+  ok  garage.json holds every table — 17 tables
+  ok  garage.json holds the ledger
+  ok  garage.json says when its attachment URLs die
+  ok  the export reads back as UTF-8 — utf-8-bom
+  ok  every row survived the file — 5 rows
+  ok  the export maps itself with nothing to do — occurred_on, amount, category, vehicle,
+      bucket, counts_toward_budget, amortize_months, merchant, note, odometer_km, currency, id
+  ok  the dry run says every row will import — 5 ready, 0 skipped
+  ok  and that no category has to be invented
+  ok  the commit imported every ready row
+  ok  importing the same file twice changes nothing
+  ok  the second ledger is the same length — 5
+  ok  row 1 came back identical
+  ok  row 2 came back identical
+  ok  row 3 came back identical
+  ok  row 4 came back identical
+  ok  row 5 came back identical
+
+Round trip clean: 5 expenses left as CSV, came back into an empty account identical,
+and Con Cào Cào kept its name through the encoding.
+```
+
+The row that matters most is row 2. It holds `Shop "Bảy" Coilover` as a merchant and a note
+of `Two lines\nof note, with a comma`, spread over six months. It went out through RFC 4180
+quoting, came back through the parser, and is byte-identical on the other side.
+
+### The bug the round trip found, and what it changed
+
+The first run of that script failed at the commit: five rows ready, five rows skipped, nothing
+imported. **A primary key is global and RLS is not.** The ids in the file belonged to the
+leaving user's rows, those rows exist in the same database, and `on conflict (id) do nothing`
+dropped every one of them — in silence, with a success message on top. That is the worst
+outcome this phase could produce: a person told they came back with everything, quietly
+missing rows.
+
+So the insert happens in two passes. Pass one keeps the id the file gave each row, which is
+what makes re-importing your own export a no-op. Pass two looks for offered ids that are
+*still not visible* after pass one — which under RLS can only mean a stranger holds them — and
+inserts those rows under an id derived from the original: `md5(user || ':' || source id)`. It
+is derived rather than random deliberately, and that is the second half of the fix: a random
+id would work exactly once, and the next import would find the source id still invisible, mint
+another, and double the ledger. Derived, the second import lands on the id the first one used,
+conflicts, and does nothing.
+
+`lib/queries/data-ownership.db.test.ts` has both halves as tests, including the stranger's row
+being untouched by any of it.
+
+### Assumptions
+
+1. **Only expenses can be imported.** The simpler reading of the phase, and the one that
+   matters: an expense is the entity people arrive with a file of, because it is the entity
+   every other tracker also has. A fuel log or a mod plan comes with this app's own idea of
+   what those are, and there is no file of them in the world to import. The JSON bundle is
+   the full-fidelity artifact; it is an export format, not an import format.
+2. **Dates are read day-first.** `01/02/2026` is the first of February. Year-first
+   (`2026-08-26`) is unambiguous and tried first, a timestamp has its time thrown away, and a
+   two-digit year is this century. The app's locale is `vi-VN` and day-first is what that
+   writes. A file from an American export will import a twelfth of its rows to the wrong month
+   and the rest not at all, which is loud, and better than silent.
+3. **An import creates categories; it never creates vehicles.** A category is a name, a colour
+   and two defaults, all four editable afterwards, so a name the garage has not got is created
+   with `DotsThree` and `#6B6357` and named in the dry run before it happens. A vehicle has a
+   purchase reading, a purchase date and a photo — inventing one from a nickname in a
+   spreadsheet would put a car in the garage nobody chose to add, so an unknown nickname is a
+   skipped row with the name in the message.
+4. **When the file does not name a bucket, the row gets the one that fits.** The category's
+   default if it has one, otherwise life for a row with no car and running for a row with one.
+   If the file *does* name a bucket and it contradicts the vehicle column, the row is skipped
+   rather than corrected — the check constraint and the zod schema both say a car bucket needs
+   a car, and quietly rewriting what somebody wrote is worse than telling them.
+5. **A bad row never stops the file, but a bad row in the commit stops everything.** Those are
+   different stages on purpose. The planner skips what it cannot read and counts it; the
+   database refuses the whole transaction if anything that got past the planner is still
+   wrong. A file of four hundred rows with one bad date imports three hundred and ninety-nine.
+6. **The row that says "already in the ledger" is only ever your own.** The dry run asks the
+   server which of the file's ids exist, and that question runs under RLS.
+7. **An import is capped at 2,000 rows and 10MB per file.** Two thousand is about five years
+   of daily spending. Measured on the local stack: 500 rows in 1.1s, 2,000 in 9.4s — every one
+   of them firing the odometer trigger and the milestone trigger from 0019. The function sets
+   its own `statement_timeout` to 60s because `authenticated` is normally given eight, and
+   `/settings/import` sets `maxDuration = 60` because Vercel's default is shorter than the
+   longest import the cap allows. A file over the cap says so and asks to be split.
+8. **Encoding is decided by elimination, not by guessing.** A byte-order mark settles it;
+   otherwise the file is decoded as UTF-8 with `fatal` on and anything that throws is treated
+   as Windows-1258. Windows-1258 writes Vietnamese tone marks as separate combining
+   characters, so the decode is followed by `normalize('NFC')` — without it, `Nguyễn` from a
+   1258 file is a different string from `Nguyễn` typed into this app and matches no category.
+   The screen names the encoding it chose and lets you override it.
+9. **The separator is scored, not sniffed.** Comma, semicolon, tab and pipe are each tried
+   over the first ten records; field count carries the signal and consistency breaks ties.
+   A one-column file gets the comma and parses identically either way. Overridable too.
+10. **Export CSVs mirror the tables.** Database column names, ISO dates, integer minor units,
+    `true`/`false`. Nothing is formatted for a locale, because a file that has been through a
+    locale is a file that has lost something. Expenses are the one exception: that file also
+    carries `category` and `vehicle` as names and puts them early, because those are what the
+    importer reads.
+11. **Every CSV starts with a byte-order mark and uses CRLF.** Excel reads a mark-less UTF-8
+    file as the system code page and turns every `đ` into mojibake.
+12. **The manifest is `attachments-manifest.csv`, not `attachments.csv`.** The second name is
+    the plain table dump. Two artifacts, two names, no guessing which one you got.
+13. **Manifest URLs last 24 hours and skip the app's signed-URL cache.** That memo exists to
+    hand the same one-hour URL to several images on a page; a day-long URL has no business in
+    it. `docs/02-DATA-MODEL.md` specifies one hour for *serving images*, which this is not.
+14. **`garage.json` is `{ garage, data, attachments_manifest }` with `format: 1`.** The version
+    is for the shape of the file, not the app, and only changes if a future version has to tell
+    two shapes apart.
+15. **Selling writes no expense.** A car sold for money is not a negative running cost — a part
+    sold on is, and `parts` already does exactly that — and a large negative row would sit in
+    one month and flatter every figure that month carries. The sale lives on the vehicle and
+    `v_vehicle_closing` nets it off.
+16. **Selling archives.** `status = 'sold'`, `sold_date`, `sold_price` and `archived_at` in one
+    update, so a sold car leaves the garage and the expense form exactly as an archived one
+    does. It is reversible from the edit screen, and reversing it clears the sale outright
+    rather than leaving a `sold_date` on an owned car.
+17. **The sale price is optional and travels with its currency.** A car given away or scrapped
+    is still a car that stopped being yours. With no price the closing summary says the figure
+    needs one rather than printing a zero, and the currency column is left as the purchase set
+    it.
+18. **The closing summary renders for a car you still own.** It is the truth about a car
+    rather than a receipt for a transaction, so it can be looked at before the decision.
+19. **`/garage` grew a "Closed chapters" list.** Sold and archived cars had no link anywhere in
+    the app, and a car whose whole log is preserved and whose page nothing links to has been
+    deleted with extra steps. Sold rows link to the closing summary, archived ones to the
+    vehicle. This is the one thing in the phase not asked for by name.
+20. **A sold car does not also show the Archive control.** It is already archived; the control
+    would be a no-op with a confirmation attached.
+
+### Migration
+
+**Yes: `supabase/migrations/0020_data_ownership.sql` needs pushing before this deploys.** It
+replays clean from zero (`npx supabase db reset`, run five times over this phase) and it is
+purely additive — no table changes, no new columns, no new enums, no data touched — but it is
+not optional, because both new screens read from it.
+
+What it contains:
+
+- `import_expenses(jsonb, jsonb)`, security invoker, `set search_path = ''`,
+  `set statement_timeout = '60s'`. Returns `{categories_created, expenses_imported,
+  expenses_reassigned, expenses_skipped}`.
+- `v_vehicle_closing`, security invoker, one row per vehicle.
+- Grants: select on the view and execute on the function, to `authenticated` and
+  `service_role`, never `anon`.
+
+**Ordering during the deploy is safe in both directions.** An older build ignores both; a
+newer build against an older database fails only on `/settings/import` and the sold page,
+neither of which anything links to until this deploys. There is no window where the ledger,
+the garage or any total is wrong.
+
+`lib/supabase/types.ts` was regenerated (`npm run db:types`) and is committed with it.
+
+### Docs
+
+**Nothing under `docs/` was edited, because this phase pre-approved no edit.** Two divergences
+to record:
+
+- **`0020` adds a function and a view that `docs/02-DATA-MODEL.md` does not name** —
+  `import_expenses()` and `v_vehicle_closing`. CLAUDE.md section 1 point 4 says a schema change
+  means a migration *plus* an edit to that document in the same commit, and rule 9 of this run
+  says never edit anything under `docs/` without pre-approval. The two point in opposite
+  directions and the run rule won, so the code diverges from the document rather than the
+  document being rewritten to match the code. **The document needs two entries under "Views
+  and functions" before this is merged.** No table, column, enum or constraint changed, so the
+  rest of it is accurate. This is the same debt Phases 5, 6 and 7 left; the outstanding list is
+  now `v_mod_costs`, `v_mod_board_totals`, `mod_board()`, `mod_reorder()`, `v_fuel_summary`,
+  `seed_service_schedules()`, `roll_up_service_schedule()`, the fuller column lists on
+  `v_service_due` and `v_fuel_consumption`, `award_milestones()`, the `stamp` column on
+  `v_timeline`, `import_expenses()` and `v_vehicle_closing`.
+- **`docs/01-PRODUCT.md` puts export under `/settings` and says nothing about import.** Both
+  are rows on that screen now, which is the obvious reading, but the document's route table
+  lists neither `/settings/export` nor `/settings/import` as routes.
+
+No new Phosphor icon was added, so `docs/03-DESIGN.md`'s canonical table needs nothing. The
+three new screens are text and figures; the only glyph on any of them is the SOLD stamp, which
+is the existing signature element.
+
+### Route size
+
+Measured with `npm run measure:bundles` after `npm run build`. The script gained three routes
+this phase — `/settings/export`, `/settings/import` and `/garage/[vehicleId]/sold` — plus
+`/garage/[vehicleId]/edit`, which was never measured and which this phase made heavier.
+
+```
+Shared baseline: 140.7KB gzipped across 9 chunks   (unchanged)
+
+/settings/export            0.0KB    140.7KB
+/settings/import            8.5KB    149.2KB
+/garage/[vehicleId]/sold    5.9KB    146.6KB
+/garage/[vehicleId]/edit   17.5KB    158.2KB
+```
+
+Every route is under the 40KB ceiling and the shared baseline did not move — nothing landed in
+the shell. `/settings/export` ships **no JavaScript of its own at all**: it is a server
+component and every download is an `<a download>` to a route handler, which is the whole reason
+the export endpoint is a route handler rather than a server action.
+
+`/settings/import` carries the decoder, the parser, the auto-mapper and the planner, and comes
+to 8.5KB because none of them is a dependency. A CSV parser from npm would have cost more than
+the screen.
+
+### Tests
+
+- `lib/csv/csv.test.ts` — 27 assertions over quoting, CRLF, lone CR, embedded breaks, the
+  byte-order mark, delimiter scoring and both encodings, including a Windows-1258 file
+  composing to the same string the app would have stored.
+- `lib/import/rows.test.ts` — 29 over date and amount reading, bucket inference, category
+  creation, the skip reasons, and the idempotent id.
+- `lib/import/schema.test.ts` — 3 over the seam between what the planner builds and what the
+  server accepts, so those two cannot drift apart silently.
+- `lib/queries/data-ownership.db.test.ts` — 10 against the stack, added to `npm run test:db`.
+  All-or-nothing, the second import being a no-op, the stranger-id collision, and every figure
+  on the closing summary.
+- `npm run verify:round-trip` — the acceptance criterion, end to end, against a production
+  build.
+
+`npm test` is 336 passing; `npm run test:db` is 205 passing; typecheck and lint are clean (the
+seven lint warnings are the pre-existing react-hook-form ones).
+
+### Not built, and why
+
+- **No zip of the actual image files.** The phase asks for "a manifest of attachment paths with
+  signed URLs valid for 24 hours", and that is what it got. Bundling the bytes would mean
+  writing a zip encoder by hand — there is no dependency for it and CLAUDE.md's stack list is
+  deliberate — and streaming a few hundred megabytes of photographs through a serverless
+  function to build one. The manifest is a CSV a two-line `curl` loop can walk.
+- **No JSON import.** `garage.json` goes out; only `expenses.csv` comes back in. Reading the
+  bundle back would mean seventeen tables in dependency order with their foreign keys
+  rewritten, which is a restore tool rather than an import, and nothing in the phase asks for
+  one. See the next-steps list.
+- **No import for fuel logs, service records, parts or mods.** Assumption 1.
+- **No "undo this import".** Every other destructive thing in the app has one. An import is
+  additive rather than destructive, and undoing it means deleting the rows it created, which
+  needs a record of which those were — the schema has nowhere to put it. See the next-steps
+  list.
+- **No scheduled backup.** Export is a thing you do, not a thing that happens.
+
+### Where confidence is low
+
+1. **The Windows-1252 case.** A file that is not UTF-8 is assumed to be Windows-1258. A
+   Vietnamese Windows machine writes 1258 and that is the phase's brief, but a file from a
+   European desktop is 1252, and the two agree on everything except a dozen accented
+   characters — so it would decode with a handful of wrong letters rather than failing loudly.
+   The encoding dropdown fixes it in one tap and names what it chose, but 1252 is not in the
+   list. Adding it is four lines if it ever comes up.
+2. **CSV formula injection is not mitigated.** A merchant named `=HYPERLINK(...)` exports as
+   that text and Excel may treat it as a formula. The usual mitigation is prefixing with an
+   apostrophe, which would corrupt the round trip — and every negative amount starts with `-`,
+   which is one of the trigger characters. For a single-user app whose export nobody else
+   opens, fidelity won. Worth revisiting if sharing ever arrives.
+3. **`months_owned` is calendar months from `age()`.** A car bought on the 31st and sold on the
+   1st is one month short of what its owner would say. That arithmetic is 0013's and predates
+   this phase; the closing summary just reads it.
+4. **The 2,000-row cap is a local measurement.** 9.4s against Docker Postgres on this machine.
+   Hosted Supabase with a real network in front of it will be slower, and the first import
+   somebody does with a decade of history is the test. The function has 60s and the route has
+   60s; if that is ever not enough, the cap comes down rather than the timeout going up.
+5. **Nothing was clicked on a phone.** Every screen in this phase was rendered against a
+   production server and read as text, and the round trip exercised the export endpoint and the
+   import function for real, but the file picker, the two dropdowns and the twenty-row preview
+   have not been touched by a thumb at 390px.
+
+### What a reviewer should check first
+
+1. **`import_expenses`, both passes.** It is the only new thing in the phase that can lose
+   data, and the two-pass insert is the subtlest code written this run. Read the comment above
+   it, then `lib/queries/data-ownership.db.test.ts`.
+2. **Run `npm run verify:round-trip`.** It is thirty seconds and it is the phase's acceptance
+   criterion. Then open `garage-*.csv` in whatever spreadsheet you actually use and check the
+   accents.
+3. **Sell a real car and look at the page.** Preferably one you have owned for years, on the
+   phone, and see whether the closing summary is a thing you would send to somebody.
+4. **The dry-run copy.** Import a deliberately broken file — a bad date, a car you do not own,
+   a duplicate id — and read what the summary says about it. Every one of those sentences is
+   written to be read by somebody who is about to trust it.
+5. **`v_vehicle_closing` against your own arithmetic**, the way the fuel figures were checked
+   in Phase 7. Purchase price plus car spend, over kilometres since the reading it was bought
+   on.
+
+### What I would build next
+
+The roadmap ends here. Six things, in the order I would do them, from what this codebase now
+looks like from the inside:
+
+1. **A restore path for `garage.json`.** Export is complete and import is one table wide. That
+   asymmetry is the largest remaining hole in "the data is yours": the file that holds
+   everything is the file nothing can read. It wants the same shape as this phase — dry run,
+   summary, one transaction — over seventeen tables in dependency order with foreign keys
+   remapped, which is a day of careful work and a lot of test.
+2. **Undo for an import, and a record of what an import did.** Every other destructive action
+   in the app has an undo and this one cannot, because nothing records which rows came from
+   which file. A small `imports` table with a timestamp, a filename and a row count, plus an
+   `import_id` on `expenses`, would give the ledger a filter, an undo, and an honest answer to
+   "where did these two hundred rows come from".
+3. **Attachment bytes, not just paths.** The manifest is the right artifact for a
+   serverless function, but the thing a person actually wants is a folder of their photos. A
+   small local script that reads the manifest and downloads it is twenty lines and belongs in
+   `scripts/`, next to the round trip.
+4. **Multi-currency, properly.** Four views and two migrations now silently exclude any amount
+   that is not in the base currency — `v_vehicle_totals`, `v_vehicle_closing`, the report
+   functions. It is honest and documented, but a trip abroad with a fuel receipt in THB
+   currently vanishes from every total in the app, and the fix is a stored rate on the row,
+   which `docs/02-DATA-MODEL.md` already anticipates ("never do arithmetic across currencies
+   without an explicit stored rate on the row").
+5. **The base currency, editable.** `/settings` still does not offer it, and three phases have
+   now written "the base currency is not editable anywhere" into a comment rather than
+   building the one form field it needs.
+6. **A second pass on the timeline's query cost.** `/garage/[vehicleId]` is 33KB of route
+   JavaScript and nine parallel queries, and it is the screen this app is for. Nothing about it
+   is wrong, but it is the only route within striking distance of the 40KB ceiling, and the
+   before/after slider plus the build log are what put it there.

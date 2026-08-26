@@ -2,7 +2,7 @@ import 'server-only'
 
 import { createClient } from '@/lib/supabase/server'
 import type { VehicleOption } from '@/lib/expenses/types'
-import type { Vehicle, VehicleTotals } from '@/lib/vehicles/types'
+import type { Vehicle, VehicleClosing, VehicleTotals } from '@/lib/vehicles/types'
 import { monthTotalsFrom } from '@/lib/queries/expenses'
 import { EMPTY_MONTH_TOTALS, type MonthViewTotals } from '@/lib/views'
 import type { IsoDate } from '@/lib/dates'
@@ -195,4 +195,49 @@ export async function fetchGarageMonthTotals(
 
 export function emptyMonthTotals(): MonthViewTotals {
   return EMPTY_MONTH_TOTALS
+}
+
+const CLOSING_COLUMNS = [
+  'vehicle_id',
+  'currency',
+  'nickname',
+  'status',
+  'purchase_date',
+  'sold_date',
+  'archived_at',
+  'sold_price',
+  'purchase_price',
+  'total_spend',
+  'running_spend',
+  'project_spend',
+  'total_invested',
+  'km_driven',
+  'cost_per_km',
+  'months_owned',
+  'net_cost',
+  'net_cost_per_km',
+  'mods_installed',
+  'fill_ups',
+  'services_done',
+  'expense_count',
+].join(', ')
+
+/**
+ * The closing summary, in one query.
+ *
+ * Every figure on that page comes from `v_vehicle_closing` — the money, the
+ * distance, the counts and the arithmetic net of the sale. Nothing on the page
+ * subtracts anything (CLAUDE.md section 3).
+ */
+export async function fetchVehicleClosing(vehicleId: string): Promise<VehicleClosing | null> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('v_vehicle_closing')
+    .select(CLOSING_COLUMNS)
+    .eq('vehicle_id', vehicleId)
+    .maybeSingle()
+
+  if (error) throw new Error(`v_vehicle_closing failed: ${error.message}`)
+  return (data as unknown as VehicleClosing) ?? null
 }

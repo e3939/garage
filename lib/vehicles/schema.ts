@@ -109,5 +109,24 @@ export const vehicleArchiveSchema = z.object({
   archived: z.boolean(),
 })
 
+/**
+ * Selling.
+ *
+ * The date is required — a sale happened on a day, and `months_owned` is
+ * measured to it rather than to today. The price is not: a car given away, or
+ * scrapped, or handed to a relative for a figure nobody wants recorded, is still
+ * a car that stopped being yours. A price of nothing means "not recorded", the
+ * same as everywhere else in this schema, and the closing summary says so rather
+ * than showing a zero.
+ */
+export const vehicleSellSchema = z.object({
+  id: z.uuid(),
+  sold_date: z.string().regex(ISO_DATE, 'Date must be YYYY-MM-DD'),
+  sold_price: optionalMinorAmount,
+  currency: z.string().length(3).toUpperCase(),
+})
+
+export type VehicleSell = z.infer<typeof vehicleSellSchema>
+
 /** The view switcher writes its choice back to the profile on every change. */
 export const defaultViewSchema = z.enum(['monthly', 'all_in', 'car_only'])

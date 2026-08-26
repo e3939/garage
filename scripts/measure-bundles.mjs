@@ -40,6 +40,8 @@ const ROUTES = [
   '/money/recurring',
   '/settings',
   '/settings/categories',
+  '/settings/export',
+  '/settings/import',
 ]
 
 function stack() {
@@ -172,6 +174,8 @@ async function main() {
     `/garage/${vehicleId}/service`,
     `/garage/${vehicleId}/fuel`,
     `/garage/${vehicleId}/parts`,
+    `/garage/${vehicleId}/sold`,
+    `/garage/${vehicleId}/edit`,
   )
 
   const server = spawn('npx', ['next', 'start', '-p', String(PORT)], {

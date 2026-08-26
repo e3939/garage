@@ -77,6 +77,41 @@ export type VehicleTotals = {
 }
 
 /**
+ * `v_vehicle_closing`: everything the closing summary is made of.
+ *
+ * The lifetime figures from `v_vehicle_totals`, plus the sale, plus the same
+ * arithmetic net of it, plus four counts of the log. Defined for a car you still
+ * own as well as one you sold — with no sale, `net_cost` is `total_invested`.
+ */
+export type VehicleClosing = {
+  vehicle_id: string
+  currency: string
+  nickname: string
+  status: VehicleStatus
+  purchase_date: IsoDate | null
+  sold_date: IsoDate | null
+  archived_at: string | null
+  /** Null when no price was recorded, or when it was in another currency. */
+  sold_price: number | null
+  purchase_price: number
+  total_spend: number
+  running_spend: number
+  project_spend: number
+  /** Purchase price plus every car-bucket expense. What the car cost to own. */
+  total_invested: number
+  km_driven: number
+  cost_per_km: number | null
+  months_owned: number | null
+  /** Total invested less the sale price. Negative if it sold for more. */
+  net_cost: number
+  net_cost_per_km: number | null
+  mods_installed: number
+  fill_ups: number
+  services_done: number
+  expense_count: number
+}
+
+/**
  * "2019 · Honda · Civic · RS · DCT · Petrol", minus whatever is not known.
  * A field nobody filled in is left out rather than shown as a dash: an empty
  * slot in a spec strip reads as a fault in the car, not a gap in the form.
