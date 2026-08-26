@@ -9,7 +9,9 @@ import {
   type FundModOption,
   type FundVehicleOption,
 } from '@/components/funds/fund-sheet'
+import { PiggyBank } from '@/components/icons'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Money } from '@/components/ui/money'
 import { Sheet } from '@/components/ui/sheet'
 import type { IsoDate } from '@/lib/dates'
@@ -76,9 +78,16 @@ export function FundList({
       </div>
 
       {funds.length === 0 ? (
-        <p className="rounded-md border border-border bg-surface p-4 text-body text-ink-muted">
+        <EmptyState
+          icon={PiggyBank}
+          action={
+            <Button variant="primary" onClick={() => setOpen({ kind: 'create' })}>
+              Start a fund
+            </Button>
+          }
+        >
           No funds yet. Set a target and a monthly figure and this says when it lands.
-        </p>
+        </EmptyState>
       ) : (
         <ul className="space-y-2">
           {funds.map((fund) => (

@@ -2,6 +2,7 @@
 // optimistic view of both.
 'use client'
 
+import Link from 'next/link'
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 
 import {
@@ -11,15 +12,18 @@ import {
 } from '@/app/(app)/expenses/actions'
 import { loadAttachmentsAction } from '@/app/(app)/attachments/actions'
 import { LazyExpenseForm, preloadExpenseForm } from '@/components/expenses/expense-form-lazy'
+import { QuickAddButton } from '@/components/expenses/quick-add-button'
 import { useExpenseStore } from '@/components/expenses/expense-store'
+import { Receipt } from '@/components/icons'
 import { LedgerDayHeading, LedgerRowButton, LEDGER_DAY_HEIGHT, LEDGER_ROW_HEIGHT } from '@/components/ledger/ledger-row'
 import type { LedgerSignalIcons } from '@/components/ledger/row-signals'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Sheet } from '@/components/ui/sheet'
 import { VirtualList } from '@/components/ui/virtual-list'
 import { dayHeading } from '@/lib/dates-display'
 import type { IsoDate } from '@/lib/dates'
-import type { LedgerFilters } from '@/lib/expenses/filters'
+import { isEmptyFilters, type LedgerFilters } from '@/lib/expenses/filters'
 import {
   applyPending,
   buildLedgerItems,
@@ -181,10 +185,27 @@ export function LedgerList({
   }
 
   if (items.length === 0) {
-    return (
-      <p className="rounded-md border border-border bg-surface p-6 text-body text-ink-muted">
-        Nothing here. Log an expense, or widen the filters.
-      </p>
+    // Two different empty screens wearing the same words would be one screen
+    // that is wrong half the time: a ledger with nothing in it needs an
+    // expense, and a ledger with nothing *matching* needs the filters back.
+    return isEmptyFilters(filters) ? (
+      <EmptyState icon={Receipt} action={<QuickAddButton />}>
+        Nothing logged yet. Every expense you add lands here, newest first.
+      </EmptyState>
+    ) : (
+      <EmptyState
+        icon={Receipt}
+        action={
+          <Link
+            href="/ledger"
+            className="inline-flex min-h-touch items-center rounded-md border border-border-strong bg-surface px-4 text-body font-medium text-ink"
+          >
+            Clear filters
+          </Link>
+        }
+      >
+        Nothing matches these filters.
+      </EmptyState>
     )
   }
 

@@ -4,6 +4,9 @@
 import dynamic from 'next/dynamic'
 import { useState, type ReactNode } from 'react'
 
+import { GasPump } from '@/components/icons'
+import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Fab } from '@/components/ui/fab'
 import { Money } from '@/components/ui/money'
 import { Sheet } from '@/components/ui/sheet'
@@ -74,9 +77,16 @@ export function FuelScreen({
   return (
     <>
       {logs.length === 0 ? (
-        <p className="text-body text-ink-muted">
+        <EmptyState
+          icon={GasPump}
+          action={
+            <Button variant="primary" onClick={() => setOpen('new')}>
+              Add fill-up
+            </Button>
+          }
+        >
           No fuel logged yet. Add your first fill-up to start tracking consumption.
-        </p>
+        </EmptyState>
       ) : (
         <ul className="overflow-hidden rounded-md border border-border bg-surface">
           {logs.map((log) => {

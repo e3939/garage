@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 
 import { categoryIconMap } from '@/components/expenses/category-icons'
+import { QuickAddButton } from '@/components/expenses/quick-add-button'
+import { ChartDonut } from '@/components/icons'
+import { EmptyState } from '@/components/ui/empty-state'
 import { CategoryBreakdown } from '@/components/reports/category-breakdown'
 import { MonthChart } from '@/components/reports/month-chart'
 import { MonthTable } from '@/components/reports/month-table'
@@ -63,6 +66,21 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     ...report.months.map((point) => Math.max(point.monthly_total, point.all_in_total)),
   )
   const scale = axisScale(peak, report.currency)
+
+  // Four charts each saying "nothing spent in this period yet" is one screen
+  // saying it four times. When the period is genuinely empty the page says it
+  // once, with the one thing there is to do about it.
+  if (report.months.every((point) => point.all_in_total === 0) && report.top.length === 0) {
+    return (
+      <div className="space-y-8">
+        <PeriodSwitcher period={period} />
+
+        <EmptyState icon={ChartDonut} action={<QuickAddButton />}>
+          Nothing spent in this period. The reports fill in as the ledger does.
+        </EmptyState>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">

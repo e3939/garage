@@ -10,7 +10,7 @@ import {
   type SignInState,
 } from '@/app/auth/sign-in-state'
 import { CodeInput } from '@/app/sign-in/code-input'
-import { CircleNotch, ICON_UI, PaperPlaneTilt } from '@/components/icons'
+import { ICON_UI, PaperPlaneTilt } from '@/components/icons'
 import { INPUT_CLASS } from '@/components/ui/field'
 
 type SignInFormProps = {
@@ -63,10 +63,10 @@ export function SignInForm({ next, initialError }: SignInFormProps) {
           {/* The code submits itself on the last digit. This is the keyboard
               path, and the path when autofill fills the field without firing
               the handler the way a keystroke does. */}
+          {/* No spinner. docs/03-DESIGN.md: nothing loops, and skeletons rather
+              than spinners — and the label already says what is happening, which
+              is the part a screen reader gets either way. */}
           <button type="submit" disabled={pending} className={BUTTON_CLASS}>
-            {pending ? (
-              <CircleNotch {...ICON_UI} className="animate-spin" aria-hidden />
-            ) : null}
             {pending ? 'Checking' : 'Sign in'}
           </button>
         </form>
@@ -131,11 +131,7 @@ export function SignInForm({ next, initialError }: SignInFormProps) {
       ) : null}
 
       <button type="submit" disabled={pending} className={BUTTON_CLASS}>
-        {pending ? (
-          <CircleNotch {...ICON_UI} className="animate-spin" aria-hidden />
-        ) : (
-          <PaperPlaneTilt {...ICON_UI} aria-hidden />
-        )}
+        {pending ? null : <PaperPlaneTilt {...ICON_UI} aria-hidden />}
         {pending ? 'Sending' : 'Send code'}
       </button>
     </form>

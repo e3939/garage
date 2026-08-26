@@ -6,10 +6,13 @@ import { useState, type ReactNode } from 'react'
 
 import { deleteServiceRecordAction } from '@/app/(app)/service/actions'
 import { Button } from '@/components/ui/button'
+import { Wrench } from '@/components/icons'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Fab } from '@/components/ui/fab'
 import { Money } from '@/components/ui/money'
 import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
+import { undoFor } from '@/components/ui/undo'
 import type { IsoDate } from '@/lib/dates'
 import type { CategoryOption } from '@/lib/expenses/types'
 import {
@@ -140,9 +143,16 @@ export function ServiceScreen({
         <h2 className="text-eyebrow font-display uppercase text-ink-muted">History</h2>
 
         {history.length === 0 ? (
-          <p className="text-body text-ink-muted">
+          <EmptyState
+            icon={Wrench}
+            action={
+              <Button variant="primary" onClick={() => setOpen({ kind: 'done', item: null })}>
+                Log service
+              </Button>
+            }
+          >
             Nothing logged yet. Marking a schedule item done writes the first entry.
-          </p>
+          </EmptyState>
         ) : (
           <ul className="overflow-hidden rounded-md border border-border bg-surface">
             {history.map((record) => (
@@ -191,8 +201,13 @@ export function ServiceScreen({
                     className="text-caption text-critical"
                     onClick={() => {
                       void deleteServiceRecordAction(record.id).then((result) => {
+                        if (!result.ok) {
+                          toast.show(result.error)
+                          return
+                        }
                         toast.show(
-                          result.ok ? `${record.name} removed from the history` : result.error,
+                          `${record.name} removed from the history`,
+                          undoFor(result, toast.show),
                         )
                       })
                     }}

@@ -17,6 +17,7 @@ import { syncAttachments } from '@/lib/attachments/server'
 import { fuelLogIdSchema, fuelLogSchema, fuelLogWriteSchema, type FuelLogWrite } from '@/lib/fuel/schema'
 import type { ExpenseWrite } from '@/lib/expenses/schema'
 import type { ActionResult } from '@/app/(app)/expenses/actions'
+import { collect, snapshot, snapshotAttachments } from '@/app/(app)/undo/snapshot'
 
 function revalidateFuelScreens(withExpense = false): void {
   revalidatePath('/garage', 'layout')
@@ -193,6 +194,20 @@ export async function deleteFuelLogAction(rawId: unknown): Promise<ActionResult>
     .eq('id', parsed.data)
     .maybeSingle()
 
+  // Photographed before anything is removed, so the toast can put the tank, the
+  // money it cost and the picture of the receipt all back. The expense goes
+  // first in the snapshot because the fill-up's `expense_id` points at it.
+  const undo = collect(
+    existing?.expense_id
+      ? await snapshot('expenses', { id: existing.expense_id })
+      : { table: 'expenses' as const, rows: [] },
+    await snapshot('fuel_logs', { id: parsed.data }),
+    await snapshotAttachments('fuel_log_id', parsed.data),
+    existing?.expense_id
+      ? await snapshotAttachments('expense_id', existing.expense_id)
+      : { table: 'attachments' as const, rows: [] },
+  )
+
   const { error } = await supabase.from('fuel_logs').delete().eq('id', parsed.data)
   if (error) return { ok: false, error: error.message }
 
@@ -201,5 +216,5 @@ export async function deleteFuelLogAction(rawId: unknown): Promise<ActionResult>
   }
 
   revalidateFuelScreens(Boolean(existing?.expense_id))
-  return { ok: true }
+  return { ok: true, undo }
 }

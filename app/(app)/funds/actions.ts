@@ -24,6 +24,7 @@ import {
   type FundWrite,
 } from '@/lib/funds/schema'
 import type { ActionResult } from '@/app/(app)/expenses/actions'
+import { collect, snapshot } from '@/app/(app)/undo/snapshot'
 
 /**
  * A fund shows up on the money screen and, when it is linked to a mod, in the
@@ -128,11 +129,19 @@ export async function deleteFundAction(rawId: unknown): Promise<ActionResult> {
   if (!parsed.success) return { ok: false, error: 'Unknown fund' }
 
   const supabase = await createClient()
+
+  // The contributions cascade with it, so they are photographed too and go back
+  // in after the fund they point at.
+  const undo = collect(
+    await snapshot('funds', { id: parsed.data }),
+    await snapshot('fund_contributions', { fund_id: parsed.data }),
+  )
+
   const { error } = await supabase.from('funds').delete().eq('id', parsed.data)
   if (error) return { ok: false, error: error.message }
 
   revalidateFundScreens()
-  return { ok: true }
+  return { ok: true, undo }
 }
 
 /**
@@ -169,9 +178,12 @@ export async function deleteContributionAction(rawId: unknown): Promise<ActionRe
   if (!parsed.success) return { ok: false, error: 'Unknown contribution' }
 
   const supabase = await createClient()
+
+  const undo = collect(await snapshot('fund_contributions', { id: parsed.data }))
+
   const { error } = await supabase.from('fund_contributions').delete().eq('id', parsed.data)
   if (error) return { ok: false, error: error.message }
 
   revalidateFundScreens()
-  return { ok: true }
+  return { ok: true, undo }
 }

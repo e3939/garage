@@ -11,6 +11,7 @@
  */
 
 import { revalidatePath } from 'next/cache'
+import type { UndoSnapshot } from '@/app/(app)/undo/snapshot'
 import { createClient } from '@/lib/supabase/server'
 import { syncAttachments } from '@/lib/attachments/server'
 import { expenseIdSchema, expenseWriteSchema, type ExpenseWrite } from '@/lib/expenses/schema'
@@ -19,7 +20,16 @@ import type { LedgerCursor } from '@/lib/expenses/types'
 import type { LedgerFilters } from '@/lib/expenses/filters'
 import type { TablesInsert } from '@/lib/supabase/types'
 
-export type ActionResult = { ok: true } | { ok: false; error: string }
+/**
+ * What every write in this app returns.
+ *
+ * `undo` is the rows a destructive write took away, photographed on the way
+ * past. A toast that offers Undo hands it straight back to `restoreSnapshot`.
+ * Optional, because most writes take nothing away. See `app/(app)/undo`.
+ */
+export type ActionResult =
+  | { ok: true; undo?: UndoSnapshot }
+  | { ok: false; error: string }
 
 /**
  * The screens an expense write can change.

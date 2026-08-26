@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
 import { Money } from '@/components/ui/money'
 import { useToast } from '@/components/ui/toast'
+import { undoFor } from '@/components/ui/undo'
 import type { FundWrite } from '@/lib/funds/schema'
 import type { FundStatus } from '@/lib/funds/types'
 import { projectFund } from '@/lib/funds/projection'
@@ -162,7 +163,7 @@ export function FundSheet({
     }
 
     onDone()
-    toast.show(`${label} deleted`)
+    toast.show(`${label} deleted`, undoFor(result, toast.show))
   }
 
   return (

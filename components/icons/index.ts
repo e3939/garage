@@ -39,7 +39,6 @@ export {
   SlidersHorizontal, // Settings
   SignOut, // Sign out
   PaperPlaneTilt, // Send the sign-in code
-  CircleNotch, // Pending
 } from '@phosphor-icons/react/dist/ssr'
 
 /** Regular weight at 20px for UI. */

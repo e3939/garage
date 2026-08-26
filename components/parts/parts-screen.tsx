@@ -6,6 +6,8 @@ import { useMemo, useState, type ReactNode } from 'react'
 
 import { refitPartAction } from '@/app/(app)/parts/actions'
 import { Button } from '@/components/ui/button'
+import { Nut } from '@/components/icons'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Fab } from '@/components/ui/fab'
 import { Money } from '@/components/ui/money'
 import { Sheet } from '@/components/ui/sheet'
@@ -94,10 +96,17 @@ export function PartsScreen({
   return (
     <div className="space-y-6">
       {parts.length === 0 ? (
-        <p className="text-body text-ink-muted">
+        <EmptyState
+          icon={Nut}
+          action={
+            <Button variant="primary" onClick={() => setOpen({ kind: 'part', item: null })}>
+              Add part
+            </Button>
+          }
+        >
           Nothing in the inventory yet. Add a part and it lands on the car; take it off later and
           the app asks what became of it.
-        </p>
+        </EmptyState>
       ) : null}
 
       {grouped.map(({ status, items }) =>

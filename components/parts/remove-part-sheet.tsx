@@ -3,11 +3,12 @@
 
 import { useState } from 'react'
 
-import { removePartAction } from '@/app/(app)/parts/actions'
+import { removePartAction, undoPartRemovalAction } from '@/app/(app)/parts/actions'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
 import { Money } from '@/components/ui/money'
+import { useToast } from '@/components/ui/toast'
 import type { IsoDate } from '@/lib/dates'
 import { formatMoney, parseAmount, parsedAmountHint } from '@/lib/money'
 import { REMOVAL_LABEL, REMOVAL_OUTCOMES, netCost, type Part, type RemovalOutcome } from '@/lib/parts/types'
@@ -44,6 +45,7 @@ export function RemovePartSheet({ part, currency, locale, today, onDone }: Remov
   const [note, setNote] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const toast = useToast()
 
   const sale = parseAmount(amountText, currency)
   const paid = part.cost
@@ -76,6 +78,24 @@ export function RemovePartSheet({ part, currency, locale, today, onDone }: Remov
     }
 
     onDone()
+
+    // Taking a part off the car is the most ambiguous write in the app: it
+    // changes a status, dates it, and — if it sold — puts a negative expense in
+    // the ledger. Undo takes all three back, and takes the expense back only if
+    // this removal is what wrote it.
+    toast.show(`${part.name} ${REMOVAL_LABEL[outcome].toLowerCase()}`, {
+      label: 'Undo',
+      run: () => {
+        void undoPartRemovalAction({
+          id: part.id,
+          status: part.status,
+          removed_on: part.removed_on,
+          sale_expense_id: part.sale_expense_id,
+        }).then((outcomeResult) => {
+          if (!outcomeResult.ok) toast.show(outcomeResult.error)
+        })
+      },
+    })
   }
 
   return (

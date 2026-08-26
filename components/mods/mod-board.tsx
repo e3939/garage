@@ -18,6 +18,9 @@ import { ModSheet } from '@/components/mods/mod-sheet'
 import type { ModIcons } from '@/components/mods/mod-icons'
 import type { ExpenseFormProps, ExpensePrefill } from '@/components/expenses/expense-form'
 import { LazyExpenseForm } from '@/components/expenses/expense-form-lazy'
+import { Gauge } from '@/components/icons'
+import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Fab } from '@/components/ui/fab'
 import { Money } from '@/components/ui/money'
 import { Sheet } from '@/components/ui/sheet'
@@ -375,7 +378,24 @@ export function ModBoard({
 
   return (
     <>
-      <div ref={trackRef} className="board-track">
+      {/* An empty board is five empty columns, which teaches nobody anything
+          the column headings do not. The board comes back the moment there is
+          one card to put on it. */}
+      {cards.length === 0 ? (
+        <EmptyState
+          icon={Gauge}
+          action={
+            <Button variant="primary" onClick={() => setCreating(true)}>
+              Add a mod
+            </Button>
+          }
+        >
+          Nothing planned yet. Add the first thing you want to do to the car and it lands in
+          Dreaming; drag it right as it gets closer to real.
+        </EmptyState>
+      ) : null}
+
+      <div ref={trackRef} className={cards.length === 0 ? 'hidden' : 'board-track'}>
         {BOARD_STATUSES.map((status) => {
           const column = columns[status]
           const totals = board.totals[status]

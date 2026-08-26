@@ -33,6 +33,7 @@ import {
 } from '@/lib/service/schema'
 import type { ExpenseWrite } from '@/lib/expenses/schema'
 import type { ActionResult } from '@/app/(app)/expenses/actions'
+import { collect, snapshot, snapshotAttachments } from '@/app/(app)/undo/snapshot'
 
 /**
  * The screens a service write can change: the schedule, the vehicle home's due
@@ -254,9 +255,15 @@ export async function deleteServiceRecordAction(rawId: unknown): Promise<ActionR
   if (!parsed.success) return { ok: false, error: 'Unknown service record' }
 
   const supabase = await createClient()
+
+  const undo = collect(
+    await snapshot('service_records', { id: parsed.data }),
+    await snapshotAttachments('service_record_id', parsed.data),
+  )
+
   const { error } = await supabase.from('service_records').delete().eq('id', parsed.data)
   if (error) return { ok: false, error: error.message }
 
   revalidateServiceScreens()
-  return { ok: true }
+  return { ok: true, undo }
 }

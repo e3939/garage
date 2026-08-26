@@ -7,6 +7,7 @@ import { confirmDraftAction, discardDraftAction } from '@/app/(app)/recurring/ac
 import { Button } from '@/components/ui/button'
 import { INPUT_CLASS } from '@/components/ui/field'
 import { useToast } from '@/components/ui/toast'
+import { undoFor } from '@/components/ui/undo'
 import { formatAmount, parseAmount, parsedAmountHint } from '@/lib/money'
 import type { DraftExpense } from '@/lib/recurring/types'
 
@@ -75,7 +76,10 @@ export function DraftTray({ drafts, locale, dateLabels }: DraftTrayProps) {
       return
     }
 
-    toast.show(`${draft.recurring_label ?? draft.merchant ?? 'Draft'} dismissed`)
+    toast.show(
+      `${draft.recurring_label ?? draft.merchant ?? 'Draft'} dismissed`,
+      undoFor(result, toast.show),
+    )
   }
 
   return (

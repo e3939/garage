@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
 import { Money } from '@/components/ui/money'
 import { useToast } from '@/components/ui/toast'
+import { undoFor } from '@/components/ui/undo'
 import type { AttachmentDraft, AttachmentView } from '@/lib/attachments/types'
 import type { IsoDate } from '@/lib/dates'
 import { buildLinkedExpense, defaultCategory } from '@/lib/expenses/linked'
@@ -205,7 +206,7 @@ export function FuelForm({
       return
     }
     onDone()
-    toast.show('Fill-up removed')
+    toast.show('Fill-up removed', undoFor(result, toast.show))
   }
 
   return (

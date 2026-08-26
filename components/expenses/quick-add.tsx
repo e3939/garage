@@ -1,10 +1,11 @@
 // Opens the sheet, so it owns open/closed state.
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import type { ExpenseFormProps } from '@/components/expenses/expense-form'
 import { LazyExpenseForm, preloadExpenseForm } from '@/components/expenses/expense-form-lazy'
+import { QUICK_ADD_EVENT } from '@/components/expenses/quick-add-signal'
 import { Fab } from '@/components/ui/fab'
 import { Sheet } from '@/components/ui/sheet'
 import { Plus } from '@/components/icons'
@@ -24,6 +25,18 @@ type QuickAddProps = Omit<ExpenseFormProps, 'mode' | 'initial' | 'onDone'>
  */
 export function QuickAdd(props: QuickAddProps) {
   const [open, setOpen] = useState(false)
+
+  // An empty screen's "Log expense" button opens this sheet, and it lives on
+  // the page rather than in this slot. See `quick-add-signal.ts`.
+  useEffect(() => {
+    function openSheet() {
+      preloadExpenseForm()
+      setOpen(true)
+    }
+
+    window.addEventListener(QUICK_ADD_EVENT, openSheet)
+    return () => window.removeEventListener(QUICK_ADD_EVENT, openSheet)
+  }, [])
 
   return (
     <>

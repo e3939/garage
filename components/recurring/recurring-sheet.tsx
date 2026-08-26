@@ -12,6 +12,7 @@ import { CategoryChips } from '@/components/expenses/category-chips'
 import { Button } from '@/components/ui/button'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
 import { useToast } from '@/components/ui/toast'
+import { undoFor } from '@/components/ui/undo'
 import { resolveBucket, resolveCountsTowardBudget } from '@/lib/budget'
 import type { IsoDate } from '@/lib/dates'
 import { BUCKET_LABEL, type CategoryOption, type VehicleOption } from '@/lib/expenses/types'
@@ -169,7 +170,7 @@ export function RecurringSheet({
     }
 
     onDone()
-    toast.show(`${initial.label} deleted`)
+    toast.show(`${initial.label} deleted`, undoFor(result, toast.show))
   }
 
   return (

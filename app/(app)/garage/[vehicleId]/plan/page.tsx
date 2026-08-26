@@ -73,13 +73,6 @@ export default async function PlanPage({ params }: PlanPageProps) {
     <div className="space-y-6">
       <BuildSheet totals={board.totals} currency={board.currency} locale={preferences.locale} />
 
-      {board.cards.length === 0 ? (
-        <p className="text-body text-ink-muted">
-          Nothing planned yet. Add the first thing you want to do to the car and it lands in
-          Dreaming; drag it right as it gets closer to real.
-        </p>
-      ) : null}
-
       <ModBoard
         vehicleId={vehicle.id}
         board={board}

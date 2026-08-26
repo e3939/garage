@@ -22,11 +22,13 @@ import {
   partCreateSchema,
   partIdSchema,
   partRemovalSchema,
+  partRemovalUndoSchema,
   partWriteSchema,
   type PartWrite,
 } from '@/lib/parts/schema'
 import type { ExpenseWrite } from '@/lib/expenses/schema'
 import type { ActionResult } from '@/app/(app)/expenses/actions'
+import { collect, snapshot, snapshotAttachments } from '@/app/(app)/undo/snapshot'
 
 function revalidatePartsScreens(withExpense = false): void {
   revalidatePath('/garage', 'layout')
@@ -278,9 +280,53 @@ export async function deletePartAction(rawId: unknown): Promise<ActionResult> {
   if (!parsed.success) return { ok: false, error: 'Unknown part' }
 
   const supabase = await createClient()
+
+  const undo = collect(
+    await snapshot('parts', { id: parsed.data }),
+    await snapshotAttachments('part_id', parsed.data),
+  )
+
   const { error } = await supabase.from('parts').delete().eq('id', parsed.data)
   if (error) return { ok: false, error: error.message }
 
   revalidatePartsScreens()
+  return { ok: true, undo }
+}
+
+/**
+ * Undo for taking a part off the car.
+ *
+ * Not a snapshot restore, because a removal is an update rather than a delete —
+ * and because selling writes an expense, which is the part of it that most
+ * wants taking back. The caller passes the part as it was; anything the removal
+ * created that was not there before is removed with it.
+ */
+export async function undoPartRemovalAction(raw: unknown): Promise<ActionResult> {
+  const parsed = partRemovalUndoSchema.safeParse(raw)
+  if (!parsed.success) return { ok: false, error: 'Unknown part' }
+
+  const supabase = await createClient()
+  const { id, status, removed_on, sale_expense_id } = parsed.data
+
+  const { data: current } = await supabase
+    .from('parts')
+    .select('sale_expense_id')
+    .eq('id', id)
+    .maybeSingle()
+
+  const { error } = await supabase
+    .from('parts')
+    .update({ status, removed_on, sale_expense_id })
+    .eq('id', id)
+
+  if (error) return { ok: false, error: error.message }
+
+  // The sale expense is deleted only if this removal is what wrote it. A part
+  // sold, put back and sold again keeps the first sale.
+  if (current?.sale_expense_id && current.sale_expense_id !== sale_expense_id) {
+    await supabase.from('expenses').delete().eq('id', current.sale_expense_id)
+  }
+
+  revalidatePartsScreens(true)
   return { ok: true }
 }

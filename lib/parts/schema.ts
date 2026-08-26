@@ -79,6 +79,23 @@ export const partRemovalSchema = z
 
 export type PartRemoval = z.infer<typeof partRemovalSchema>
 
+/**
+ * The part as it was before it came off the car, for the removal's Undo.
+ *
+ * Only the three columns a removal touches. The sale expense is not named here
+ * because the server works out whether this removal is what wrote it — a part
+ * sold, refitted and sold again must not lose the first sale to the second
+ * one's undo.
+ */
+export const partRemovalUndoSchema = z.object({
+  id: z.uuid(),
+  status: z.enum(['on_car', 'shelf', 'sold', 'binned']),
+  removed_on: isoDate.nullable().default(null),
+  sale_expense_id: z.uuid().nullable().default(null),
+})
+
+export type PartRemovalUndo = z.infer<typeof partRemovalUndoSchema>
+
 /** A part created from scratch, optionally with the expense that bought it. */
 export const partCreateSchema = z.object({
   part: partWriteSchema,

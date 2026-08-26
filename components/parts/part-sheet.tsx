@@ -12,6 +12,7 @@ import { Chip } from '@/components/ui/chip'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
 import { Money } from '@/components/ui/money'
 import { useToast } from '@/components/ui/toast'
+import { undoFor } from '@/components/ui/undo'
 import type { AttachmentDraft, AttachmentView } from '@/lib/attachments/types'
 import type { IsoDate } from '@/lib/dates'
 import { buildLinkedExpense, defaultCategory } from '@/lib/expenses/linked'
@@ -196,7 +197,7 @@ export function PartSheet({
       return
     }
     onDone()
-    toast.show(`${initial.name} deleted`)
+    toast.show(`${initial.name} deleted`, undoFor(result, toast.show))
   }
 
   return (

@@ -5,6 +5,9 @@ import { useState, type ReactNode } from 'react'
 
 import { setRecurringActiveAction } from '@/app/(app)/recurring/actions'
 import { RecurringSheet } from '@/components/recurring/recurring-sheet'
+import { ClockCounterClockwise } from '@/components/icons'
+import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Money } from '@/components/ui/money'
 import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
@@ -72,10 +75,17 @@ export function RecurringList({
       </div>
 
       {templates.length === 0 ? (
-        <p className="rounded-md border border-border bg-surface p-4 text-body text-ink-muted">
+        <EmptyState
+          icon={ClockCounterClockwise}
+          action={
+            <Button variant="primary" onClick={() => setOpen({ template: null })}>
+              Add a template
+            </Button>
+          }
+        >
           No recurring expenses yet. Add one and a draft appears on its due date, waiting for you to
           confirm it.
-        </p>
+        </EmptyState>
       ) : (
         <ul className="overflow-hidden rounded-md border border-border bg-surface">
           {templates.map((template) => (

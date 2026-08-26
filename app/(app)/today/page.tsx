@@ -3,6 +3,9 @@ import Link from 'next/link'
 
 import { categoryIconMap } from '@/components/expenses/category-icons'
 import { MonthTotal } from '@/components/expenses/month-total'
+import { QuickAddButton } from '@/components/expenses/quick-add-button'
+import { Receipt } from '@/components/icons'
+import { EmptyState } from '@/components/ui/empty-state'
 import { LedgerList } from '@/components/ledger/ledger-list'
 import { DraftTray } from '@/components/recurring/draft-tray'
 import { ledgerSignalIcons } from '@/components/ledger/row-signals'
@@ -74,9 +77,9 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
       <section className="space-y-3">
         <h2 className="text-eyebrow font-display uppercase text-ink-muted">Latest</h2>
         {recent.rows.length === 0 ? (
-          <p className="rounded-md border border-border bg-surface p-6 text-body text-ink-muted">
-            Nothing logged yet. Tap the plus to add your first expense.
-          </p>
+          <EmptyState icon={Receipt} action={<QuickAddButton />}>
+            Nothing logged yet. Add your first expense and the month starts counting.
+          </EmptyState>
         ) : (
           <>
             <LedgerList

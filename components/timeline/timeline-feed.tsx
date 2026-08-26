@@ -11,11 +11,14 @@ import {
   loadTimelinePageAction,
   type LoadedNote,
 } from '@/app/(app)/timeline/actions'
+import { QuickAddButton } from '@/components/expenses/quick-add-button'
+import { ClockCounterClockwise } from '@/components/icons'
 import { FuelGroup } from '@/components/timeline/fuel-group'
 import { TimelineNoteForm } from '@/components/timeline/note-form'
 import { TimelineRowCard } from '@/components/timeline/timeline-row'
 import type { TimelineKindIcons } from '@/components/timeline/kind-icons'
 import { Button } from '@/components/ui/button'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
 import type { IsoDate } from '@/lib/dates'
@@ -164,11 +167,14 @@ export function TimelineFeed({
   }
 
   if (items.length === 0) {
+    // "Log expense" rather than "Add note", even though a note is the more
+    // build-log thing to write: an expense against this car is the entry that
+    // fills every other number on the screen too, and Add note is a labelled
+    // pill directly above the FAB either way.
     return (
-      <p className="rounded-md border border-border bg-surface p-6 text-body text-ink-muted">
-        Nothing logged for this car yet. Expenses, service and fill-ups land here on their own;
-        add a note for the things that cost nothing.
-      </p>
+      <EmptyState icon={ClockCounterClockwise} action={<QuickAddButton />}>
+        Nothing logged for this car yet. Expenses, service and fill-ups land here on their own.
+      </EmptyState>
     )
   }
 

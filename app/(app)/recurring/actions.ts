@@ -28,6 +28,7 @@ import {
   type RecurringWrite,
 } from '@/lib/recurring/schema'
 import type { ActionResult } from '@/app/(app)/expenses/actions'
+import { collect, snapshot } from '@/app/(app)/undo/snapshot'
 
 /** A template moves the recurring screen; a confirmed draft moves everything. */
 function revalidateRecurringScreens(withLedger = false): void {
@@ -139,6 +140,8 @@ export async function deleteRecurringAction(rawId: unknown): Promise<ActionResul
 
   const supabase = await createClient()
 
+  const undo = collect(await snapshot('recurring_expenses', { id: parsed.data }))
+
   const { error: unlinked } = await supabase
     .from('expenses')
     .update({ recurring_id: null })
@@ -149,7 +152,10 @@ export async function deleteRecurringAction(rawId: unknown): Promise<ActionResul
   if (error) return { ok: false, error: error.message }
 
   revalidateRecurringScreens()
-  return { ok: true }
+  // The drafts this template had already generated keep their loosened link.
+  // Putting the template back does not re-attach them, which is the honest
+  // outcome: they are decisions about money, not children of the template.
+  return { ok: true, undo }
 }
 
 /**
@@ -188,6 +194,9 @@ export async function discardDraftAction(rawId: unknown): Promise<ActionResult> 
   if (!parsed.success) return { ok: false, error: 'Unknown draft' }
 
   const supabase = await createClient()
+
+  const undo = collect(await snapshot('expenses', { id: parsed.data, is_draft: 'true' }))
+
   const { error } = await supabase
     .from('expenses')
     .delete()
@@ -197,5 +206,5 @@ export async function discardDraftAction(rawId: unknown): Promise<ActionResult> 
   if (error) return { ok: false, error: error.message }
 
   revalidateRecurringScreens()
-  return { ok: true }
+  return { ok: true, undo }
 }
