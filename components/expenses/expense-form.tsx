@@ -18,11 +18,13 @@ import { ImpactControl } from '@/components/expenses/impact-control'
 import { useExpenseStore } from '@/components/expenses/expense-store'
 import { Button } from '@/components/ui/button'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
+import { Money } from '@/components/ui/money'
 import { resolveBucket, resolveCountsTowardBudget } from '@/lib/budget'
 import { isIsoDate, type IsoDate } from '@/lib/dates'
 import type { ExpenseWrite } from '@/lib/expenses/schema'
 import { draftLedgerRow } from '@/lib/expenses/optimistic'
 import type { CategoryOption, ExpenseBucket, LedgerRow, VehicleOption } from '@/lib/expenses/types'
+import type { FundOffer } from '@/lib/funds/types'
 import { formatAmount, parseAmount, parsedAmountHint } from '@/lib/money'
 import type { AttachmentDraft, AttachmentView } from '@/lib/attachments/types'
 
@@ -83,6 +85,12 @@ export type ExpenseFormProps = {
   userId: string
   /** The photos already on this expense, signed. Empty on a new one. */
   initialAttachments?: readonly AttachmentView[]
+  /**
+   * A sinking fund saved up for exactly this, offered by the mark-installed
+   * flow. Absent everywhere else — the ledger and quick add never show it, and
+   * an edit never sees it, because setting the fund is what spends it.
+   */
+  fund?: FundOffer | null
   onDone: () => void
 }
 
@@ -165,6 +173,7 @@ export function ExpenseForm({
   today,
   userId,
   initialAttachments,
+  fund = null,
   onDone,
 }: ExpenseFormProps) {
   const store = useExpenseStore()
@@ -192,6 +201,13 @@ export function ExpenseForm({
     const start = defaults(initial, categories, today, locale, currency, prefill)
     return start.bucketOverride !== '' || start.countsOverride !== ''
   }, [initial, categories, today, locale, currency, prefill])
+
+  /**
+   * Offered, and offered switched on: a fund linked to this mod exists because
+   * somebody put money aside for this exact purchase, so the useful default is
+   * yes. Turning it off leaves the fund alone and the expense unflagged.
+   */
+  const [useFund, setUseFund] = useState(fund !== null)
 
   const [moreOpen, setMoreOpen] = useState(overridden)
   const [impactOpen, setImpactOpen] = useState(overridden)
@@ -349,6 +365,10 @@ export function ExpenseForm({
       // otherwise, so editing an expense in the ledger cannot unlink it from the
       // mod it paid for — see `linkedUuid` in `lib/expenses/schema.ts`.
       ...(prefill?.modPlanId ? { mod_plan_id: prefill.modPlanId } : {}),
+      // Same rule, and for a sharper reason: the action writes the drawdown when
+      // it sees this column on a create, so an edit that carried it would take
+      // the money out of the fund a second time.
+      ...(fund && useFund && mode === 'create' ? { fund_id: fund.fund_id } : {}),
     }
 
     const row = draftLedgerRow(write, {
@@ -390,6 +410,30 @@ export function ExpenseForm({
             }}
           />
         </Field>
+
+        {fund ? (
+          <div className="space-y-2 rounded-md border border-border bg-surface-sunken p-3">
+            <label className="flex min-h-touch cursor-pointer items-center gap-3">
+              <input
+                type="checkbox"
+                className="size-5 accent-fire-brick"
+                checked={useFund}
+                onChange={(event) => setUseFund(event.target.checked)}
+              />
+              <span className="min-w-0 flex-1 text-body text-ink">
+                {`Pay from the ${fund.name} fund`}
+              </span>
+            </label>
+            <p className="text-caption text-ink-muted">
+              <FundDrawdownLine
+                fund={fund}
+                amount={amount}
+                enabled={useFund}
+                locale={locale}
+              />
+            </p>
+          </div>
+        ) : null}
 
         <div className="space-y-2">
           <p className="text-label text-ink-muted">Category</p>
@@ -562,5 +606,45 @@ export function ExpenseForm({
         </Button>
       </div>
     </form>
+  )
+}
+
+/**
+ * What saving this does to the fund, in one sentence.
+ *
+ * The drawdown is capped at the balance, here and in the server action, and the
+ * action is the one that counts — it reads the balance itself rather than
+ * trusting this number. A fund can be emptied; it cannot be pushed below zero.
+ */
+function FundDrawdownLine({
+  fund,
+  amount,
+  enabled,
+  locale,
+}: {
+  fund: FundOffer
+  amount: number | null
+  enabled: boolean
+  locale: string
+}) {
+  const balance = (
+    <Money amount={fund.balance} currency={fund.currency} locale={locale} size="label" />
+  )
+
+  if (!enabled) return <>{'Leaves '}{balance}{' where it is.'}</>
+
+  if (amount === null || amount <= 0) {
+    return <>{balance}{' in it.'}</>
+  }
+
+  const drawdown = Math.min(amount, fund.balance)
+
+  return (
+    <>
+      {balance}
+      {' in it. Saving takes '}
+      <Money amount={drawdown} currency={fund.currency} locale={locale} size="label" />
+      {drawdown < amount ? ' out — all of it — and the rest comes from somewhere else.' : ' out.'}
+    </>
   )
 }

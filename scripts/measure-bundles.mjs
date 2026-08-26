@@ -36,6 +36,8 @@ const ROUTES = [
   '/garage',
   '/garage/new',
   '/money',
+  '/money/reports',
+  '/money/recurring',
   '/settings',
   '/settings/categories',
 ]

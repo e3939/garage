@@ -107,6 +107,13 @@ export type Database = {
             foreignKeyName: "attachments_expense_id_fkey"
             columns: ["expense_id"]
             isOneToOne: false
+            referencedRelation: "v_draft_expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attachments_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
             referencedRelation: "v_expense_impact"
             referencedColumns: ["expense_id"]
           },
@@ -334,6 +341,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "expenses_fund_id_fkey"
+            columns: ["fund_id"]
+            isOneToOne: false
+            referencedRelation: "v_fund_status"
+            referencedColumns: ["fund_id"]
+          },
+          {
             foreignKeyName: "expenses_mod_plan_id_fkey"
             columns: ["mod_plan_id"]
             isOneToOne: false
@@ -438,6 +452,13 @@ export type Database = {
             foreignKeyName: "fuel_logs_expense_id_fkey"
             columns: ["expense_id"]
             isOneToOne: false
+            referencedRelation: "v_draft_expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fuel_logs_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
             referencedRelation: "v_expense_impact"
             referencedColumns: ["expense_id"]
           },
@@ -502,6 +523,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "funds"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_contributions_fund_id_fkey"
+            columns: ["fund_id"]
+            isOneToOne: false
+            referencedRelation: "v_fund_status"
+            referencedColumns: ["fund_id"]
           },
         ]
       }
@@ -843,6 +871,13 @@ export type Database = {
             foreignKeyName: "parts_expense_id_fkey"
             columns: ["expense_id"]
             isOneToOne: false
+            referencedRelation: "v_draft_expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parts_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
             referencedRelation: "v_expense_impact"
             referencedColumns: ["expense_id"]
           },
@@ -865,6 +900,13 @@ export type Database = {
             columns: ["sale_expense_id"]
             isOneToOne: false
             referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parts_sale_expense_id_fkey"
+            columns: ["sale_expense_id"]
+            isOneToOne: false
+            referencedRelation: "v_draft_expenses"
             referencedColumns: ["id"]
           },
           {
@@ -1081,6 +1123,13 @@ export type Database = {
             columns: ["expense_id"]
             isOneToOne: false
             referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_records_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "v_draft_expenses"
             referencedColumns: ["id"]
           },
           {
@@ -1347,6 +1396,54 @@ export type Database = {
         }
         Relationships: []
       }
+      v_budget_category_month: {
+        Row: {
+          budget_amount: number | null
+          budget_id: string | null
+          category_bucket: Database["public"]["Enums"]["expense_bucket"] | null
+          category_colour_hex: string | null
+          category_icon: string | null
+          category_id: string | null
+          category_name: string | null
+          currency: string | null
+          expense_count: number | null
+          month: string | null
+          remaining: number | null
+          spent: number | null
+          used_fraction: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budgets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budgets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_categories_ranked"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_budget_month: {
+        Row: {
+          budget_amount: number | null
+          budget_id: string | null
+          currency: string | null
+          expense_count: number | null
+          month: string | null
+          remaining: number | null
+          spent: number | null
+          used_fraction: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
       v_categories_ranked: {
         Row: {
           archived_at: string | null
@@ -1388,6 +1485,74 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "v_categories_ranked"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_draft_expenses: {
+        Row: {
+          amortize_months: number | null
+          amount: number | null
+          bucket: Database["public"]["Enums"]["expense_bucket"] | null
+          category_colour_hex: string | null
+          category_icon: string | null
+          category_id: string | null
+          category_name: string | null
+          counts_toward_budget: boolean | null
+          created_at: string | null
+          currency: string | null
+          id: string | null
+          merchant: string | null
+          note: string | null
+          occurred_on: string | null
+          recurring_cadence: Database["public"]["Enums"]["recurrence"] | null
+          recurring_id: string | null
+          recurring_label: string | null
+          user_id: string | null
+          vehicle_id: string | null
+          vehicle_nickname: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "v_categories_ranked"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_fuel_summary"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "expenses_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "expenses_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
             referencedColumns: ["id"]
           },
         ]
@@ -1507,6 +1672,67 @@ export type Database = {
           vehicle_id: string | null
         }
         Relationships: []
+      }
+      v_fund_status: {
+        Row: {
+          balance: number | null
+          closed_at: string | null
+          contribution_count: number | null
+          created_at: string | null
+          currency: string | null
+          fund_id: string | null
+          last_contributed_on: string | null
+          mod_plan_id: string | null
+          mod_status: Database["public"]["Enums"]["mod_status"] | null
+          mod_title: string | null
+          monthly_contribution: number | null
+          months_remaining: number | null
+          name: string | null
+          progress: number | null
+          projected_on: string | null
+          remaining: number | null
+          target_amount: number | null
+          user_id: string | null
+          vehicle_id: string | null
+          vehicle_nickname: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "funds_mod_plan_id_fkey"
+            columns: ["mod_plan_id"]
+            isOneToOne: false
+            referencedRelation: "mod_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "funds_mod_plan_id_fkey"
+            columns: ["mod_plan_id"]
+            isOneToOne: false
+            referencedRelation: "v_mod_costs"
+            referencedColumns: ["mod_plan_id"]
+          },
+          {
+            foreignKeyName: "funds_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_fuel_summary"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "funds_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "funds_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       v_mod_board_totals: {
         Row: {
@@ -1707,6 +1933,20 @@ export type Database = {
       }
     }
     Functions: {
+      copy_budgets_from: {
+        Args: { p_from: string; p_to: string }
+        Returns: number
+      }
+      generate_due_recurrences: {
+        Args: { p_today?: string }
+        Returns: {
+          amount: number
+          expense_id: string
+          occurred_on: string
+          recurring_id: string
+          user_id: string
+        }[]
+      }
       ledger_page: {
         Args: {
           p_amount_max?: number
@@ -1776,6 +2016,83 @@ export type Database = {
       }
       mod_reorder: {
         Args: { p_moves: Json; p_today: string; p_vehicle_id: string }
+        Returns: number
+      }
+      next_recurrence_due: {
+        Args: {
+          p_cadence: Database["public"]["Enums"]["recurrence"]
+          p_day_of_month?: number
+          p_from: string
+          p_month_of_year?: number
+        }
+        Returns: string
+      }
+      report_buckets: {
+        Args: { p_currency: string; p_from: string; p_to: string }
+        Returns: {
+          all_in_total: number
+          bucket: Database["public"]["Enums"]["expense_bucket"]
+          expense_count: number
+          monthly_total: number
+        }[]
+      }
+      report_categories: {
+        Args: { p_currency: string; p_from: string; p_to: string }
+        Returns: {
+          all_in_total: number
+          bucket: Database["public"]["Enums"]["expense_bucket"]
+          category_id: string
+          colour_hex: string
+          expense_count: number
+          icon: string
+          monthly_total: number
+          name: string
+        }[]
+      }
+      report_months: {
+        Args: { p_currency: string; p_from: string; p_to: string }
+        Returns: {
+          all_in_count: number
+          all_in_total: number
+          car_only_count: number
+          car_only_total: number
+          month: string
+          monthly_count: number
+          monthly_total: number
+        }[]
+      }
+      report_top_expenses: {
+        Args: {
+          p_currency: string
+          p_from: string
+          p_limit?: number
+          p_to: string
+        }
+        Returns: {
+          amortize_months: number
+          amount: number
+          bucket: Database["public"]["Enums"]["expense_bucket"]
+          category_colour_hex: string
+          category_icon: string
+          category_id: string
+          category_name: string
+          counts_toward_budget: boolean
+          currency: string
+          id: string
+          merchant: string
+          note: string
+          occurred_on: string
+          vehicle_id: string
+          vehicle_nickname: string
+        }[]
+      }
+      save_budgets: {
+        Args: {
+          p_caps?: Json
+          p_currency: string
+          p_month: string
+          p_overall?: number
+        }
         Returns: number
       }
       timeline_page: {

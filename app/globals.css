@@ -365,6 +365,50 @@
   }
 
   /* ---------------------------------------------------------------------
+     The budget arc. docs/03-DESIGN.md, signature element 2: "the needle
+     sweeps in on load (600ms, once, then never again during the session)".
+
+     Two animations, both written so their final keyframe is also the resting
+     declaration. That is what makes reduced motion correct rather than merely
+     quiet: the global rule above collapses every animation to 0.01ms, so the
+     needle lands on its angle and the segment is drawn — instantly, and in the
+     right place. An animation whose resting state was "zero" would leave the
+     dial reading nothing for anybody who has asked for less movement.
+
+     `iteration-count: 1` and no transition anywhere near it: it plays as the
+     page renders and does not play again.
+     --------------------------------------------------------------------- */
+  .arc-fill {
+    stroke-dashoffset: 0;
+    animation: arc-fill var(--duration-arc) var(--ease-enter) 1 both;
+  }
+
+  @keyframes arc-fill {
+    from {
+      stroke-dashoffset: var(--arc-length, 0);
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .arc-needle {
+    transform-box: view-box;
+    transform-origin: 100px 92px;
+    transform: rotate(var(--arc-angle, 0deg));
+    animation: arc-needle var(--duration-arc) var(--ease-enter) 1 both;
+  }
+
+  @keyframes arc-needle {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(var(--arc-angle, 0deg));
+    }
+  }
+
+  /* ---------------------------------------------------------------------
      The full-screen photo viewer. A native <dialog> again, so the focus trap,
      the escape key and the inert background are the platform's. It is the one
      surface in the app that is not paper: a photograph judged against ivory

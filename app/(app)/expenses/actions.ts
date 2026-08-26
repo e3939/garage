@@ -70,7 +70,55 @@ function toRow(input: ExpenseWrite, userId: string) {
     // Absent means "do not touch": an edit from the ledger does not carry the
     // mod link and must not clear it. See `linkedUuid` in the schema.
     ...(input.mod_plan_id === undefined ? {} : { mod_plan_id: input.mod_plan_id }),
+    ...(input.fund_id === undefined ? {} : { fund_id: input.fund_id }),
   }
+}
+
+/**
+ * Take the cost of this expense out of the fund that was saved up for it.
+ *
+ * docs/01-PRODUCT.md, section G: "When a linked mod is marked installed, the
+ * fund is drawn down and the expense is flagged `funded_from_fund`." The flag is
+ * `expenses.fund_id` — the column the data model already defines as "set when
+ * paid from a sinking fund" — and the drawdown is a negative contribution,
+ * because a fund's balance is the sum of its contributions and nothing else
+ * (docs/02-DATA-MODEL.md).
+ *
+ * The balance is read here rather than trusted from the browser, and the
+ * drawdown is capped at it: a fund can be emptied but never pushed below zero,
+ * because a sinking fund with minus two million in it is not a thing that
+ * happened. A refund — a negative expense — draws nothing.
+ *
+ * Returns an error message, or null when there was nothing to do or it was done.
+ */
+async function drawDownFund(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  input: ExpenseWrite,
+): Promise<string | null> {
+  if (!input.fund_id || input.amount <= 0) return null
+
+  const { data, error } = await supabase
+    .from('v_fund_status')
+    .select('balance')
+    .eq('fund_id', input.fund_id)
+    .maybeSingle()
+
+  if (error) return error.message
+  if (!data) return 'That fund no longer exists'
+
+  const drawdown = Math.min(input.amount, data.balance ?? 0)
+  if (drawdown <= 0) return null
+
+  const { error: written } = await supabase.from('fund_contributions').insert({
+    user_id: userId,
+    fund_id: input.fund_id,
+    occurred_on: input.occurred_on,
+    amount: -drawdown,
+    note: input.merchant ?? input.note,
+  })
+
+  return written?.message ?? null
 }
 
 /**
@@ -95,6 +143,11 @@ export async function createExpenseAction(
 
   const photoError = await syncAttachments('expense', parsed.data.id, userId, rawAttachments)
   if (photoError) return { ok: false, error: photoError }
+
+  // On create only. Setting the fund is what spends it, so an edit that carried
+  // the same column would spend it a second time.
+  const fundError = await drawDownFund(supabase, userId, parsed.data)
+  if (fundError) return { ok: false, error: fundError }
 
   revalidateExpenseScreens()
   return { ok: true }

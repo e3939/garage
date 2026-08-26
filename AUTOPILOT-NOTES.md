@@ -2140,3 +2140,274 @@ divergences need recording:
 7. **Sell a part off a mod and check the mod's actual.** Buy at twelve, sell at three, read
    nine — on the card, on the vehicle page's planning accuracy, and in the ledger as one row
    with a minus in front of it.
+
+---
+
+## Phase 8 — Budgets, funds, reports and recurrences
+
+Branch: `feat/08-money-tools` (the roadmap calls this Phase 7, "Budgets, funds, reports,
+recurrences"; the heading follows the branch number so the sections in this file stay in
+order, as in every phase before it).
+
+This phase was built across two runs. The first hit a session limit part-way through an edit
+and was committed as `wip(08-money-tools)` with `components/expenses/expense-form.tsx` in a
+state that did not typecheck. The second run finished it, audited the rest of the phase
+against the brief, and found two things the first run had left undone and one bug it had
+shipped. All three are written up below rather than quietly fixed.
+
+### What was built
+
+- **Budgets that respect amortisation.** An overall monthly figure plus optional per-category
+  caps, edited together in one sheet and saved in one transaction by `save_budgets` — because
+  clearing the overall figure and adding a cap in two round trips leaves a window where the
+  month is a lie. `copy_budgets_from` brings last month forward and is insert-only: a figure
+  already typed for the target month wins, since the button is offered as a starting point and
+  silently overwriting somebody's number is the worst kind of helpful. Every budget figure
+  reads `v_expense_impact` and nothing else, which is the one rule the whole phase rests on.
+- **The tachometer arc**, to the letter of `docs/03-DESIGN.md`: 240 degrees, ticks every 10%,
+  denser past the redline, sweeping once on load. The dial reads to 125% rather than 100%,
+  because a dial that ended at its redline would have nowhere to put a needle that has gone
+  past it, and past the redline is the one state the graphic exists to make legible. It is an
+  SVG drawn by a Server Component, so it costs no client JavaScript, and both animations are
+  written so their final state is also their static state — which is what makes the reduced
+  motion rule correct rather than merely quiet.
+- **Sinking funds.** Name, optional linked mod, target, monthly contribution; contributions
+  logged by hand. The balance is the sum of contributions and is never stored, so a drawdown
+  is just a negative one and there is no second column to keep in step. The projection is
+  deliberately naive arithmetic and the sentence it produces says so out loud.
+- **Recurring templates**, with a `pg_cron` job at 00:05 Asia/Ho_Chi_Minh calling
+  `generate_due_recurrences()` directly inside Postgres — no HTTP, no secret stored in the
+  database. Drafts land in a tray on `/today` with the amount editable before confirming, and
+  are invisible to every view and every total in the app until somebody taps Confirm.
+- **Reports**: month over month with both views side by side, category breakdown, life against
+  car, and the largest ten of a period. All four are SVG from Server Components; `/money/reports`
+  ships 2.9KB of its own JavaScript.
+- **`app/api/cron/recurring`**, the same job triggered from outside, behind two locks:
+  `CRON_SECRET` decides who may ask (compared in constant time, and absent means refuse rather
+  than default open), and `SUPABASE_SECRET_KEY` decides what the work runs as. It is the first
+  and only use of the secret key in the codebase.
+
+### Proof the secret-key check works
+
+`scripts/check-secret-key.mjs` is new, and an assertion that a guard works is worth nothing, so
+it was made to fail on purpose — the same method as the emoji probes in Phase 0.
+
+Three probe files were planted, one per rule, each written to satisfy the other two rules so
+that every failure is attributable to exactly one:
+
+| Probe | Rule it breaks |
+|---|---|
+| `app/leak-probe-public.ts` — `NEXT_PUBLIC_SUPABASE_SECRET_KEY`, with `server-only` | the prefix rule |
+| `components/leak-probe-client.tsx` — `'use client'` + `SUPABASE_SERVICE_ROLE_KEY`, with `server-only` | the client-module rule |
+| `lib/leak-probe-bare.ts` — `SUPABASE_SECRET_KEY`, no `server-only` | the server-only rule |
+
+`node scripts/check-secret-key.mjs` reported all three by file and line number and exited `1`.
+The probes were deleted and it exited `0` again. Both spellings of the key are matched, because
+Supabase renamed `service_role` to `secret` and a codebase mid-rename has both.
+
+**The script is the second lock, not the first, and the difference matters.** A fourth probe
+was planted: a `'use client'` component that imports `lib/supabase/admin.ts` without ever naming
+the key, and a page that renders it. `npm run build` failed with
+
+```
+Error: 'server-only' cannot be imported from a Client Component module
+    ./components/leak-probe-import.tsx [Client Component Browser]
+    ./app/(app)/leak-probe/page.tsx [Server Component]
+```
+
+naming the whole import chain. The check script did **not** flag that probe, and correctly so —
+it scans for the key by name, and that file does not contain it. So the two locks cover
+different failures and neither is redundant: `server-only` catches the transitive import
+through any number of re-exports, and the script catches the direct naming that a
+`server-only` import at the top of the file would otherwise make look fine. Both probes were
+removed and the build passes clean.
+
+### The acceptance criterion, with the working shown
+
+> A month containing one big purchase shows a sane monthly number and an honest all-in number,
+> and both are understandable at a glance.
+
+`lib/queries/money-tools.db.test.ts` is that sentence written as assertions. The fixture is
+May 2026, in VND:
+
+| | Amount | Bucket | Counts | Spread |
+|---|---|---|---|---|
+| Rent | 8.000.000 | life | yes | 1 month |
+| Tyres | 24.000.000 | car running | yes | 24 months |
+| Fuel | 1.500.000 | car running | yes | 1 month |
+| Track day | 3.000.000 | car project | **no** | 1 month |
+
+```
+monthly (what the budget is measured against)  10.500.000   8.000.000 + 1.000.000 + 1.500.000
+all-in  (what actually left the account)       36.500.000   everything, on the day it was paid
+car only                                       28.500.000
+```
+
+Against a 12.000.000 budget that is 87.5% — under the redline, on a month that cost thirty-six
+and a half million. Read against the all-in figure the same month would be 304% and the arc
+would be screaming about a month that is genuinely fine. That is the bug the whole
+`v_expense_impact` rule exists to prevent, and it is now asserted rather than assumed.
+
+The track day is the case that separates "counts toward the budget" from "happened": three
+expenses move the budget, four happened, and the counts differ in the view. June carries
+1.000.000 of tyres and nothing else.
+
+### What the first run left unfinished
+
+1. **The four typecheck errors** in `components/expenses/expense-form.tsx` were only missing
+   imports — `FundOffer` from `lib/funds/types` and `Money` from `components/ui/money`. Both
+   already existed; the drawdown UI itself was written and correct.
+
+2. **The fund drawdown was unreachable.** This is the one that mattered, and the missing
+   imports were its symptom rather than the problem. `fetchFundOffersByMod()` was written,
+   exported and called from nowhere: the plan page never fetched offers, `ModBoard` had no prop
+   to carry one, so `ExpenseForm`'s `fund` prop was always `undefined` and the block never
+   rendered. The server half was complete — `drawDownFund()`, `expenses.fund_id`, the
+   create-only guard in the zod schema — so the feature was one prop short of working while
+   looking finished from either end. Now: the plan page fetches offers in parallel with
+   everything else it needs, and the board picks the offer per card, because a fund is a
+   property of the mod being installed and not of the page.
+
+3. **A test file two other files cite by name did not exist.** `lib/recurring/cadence.ts` and
+   migration 0017 both say `lib/recurring/cadence.db.test.ts` runs the TypeScript mirror and the
+   SQL function over the same dates and asserts they agree — the sentence that makes "if they
+   disagree, the database is right" a checkable claim rather than a hope. There was no such
+   file, and the phase shipped no `.db.test.ts` at all, the first phase not to.
+
+### The bug the first run shipped, and migration 0018
+
+`report_categories` never worked. It could not have: the query ends
+
+```sql
+full join cash c on c.category_id is not distinct from i.category_id
+```
+
+and Postgres refuses that outright —
+
+```
+0A000: FULL JOIN is only supported with merge-joinable or hash-joinable join conditions
+```
+
+`is not distinct from` is neither, and a FULL JOIN has no nested-loop fallback to drop to. The
+function fails on every call with every input, so the "By category" section of `/money/reports`
+was a 500 from the moment it shipped. It was found by writing the test above, not by reading
+the code, and nothing in typecheck, lint or build could have caught it — a SQL function is
+opaque to all three until something calls it.
+
+The intent behind the join was right and is kept: an expense with no category is a real row
+that has to appear in the breakdown, and a plain `=` drops it from both sides because null
+never equals null. **`0017_money_tools.sql` had already been pushed to production and is
+frozen**, so the fix is `0018_report_categories_join.sql`, a `create or replace` with the same
+signature, return type and ordering — the application needs no edit. The set of categories is
+built with a `UNION` (which does treat two nulls as equal, so the uncategorised row survives
+exactly once) and each half is attached with a `LEFT JOIN`, where `is not distinct from` is
+allowed because a left join can fall back to a nested loop.
+
+`report_buckets` has the same shape but joins on plain equality over a column that is never
+null, so it was always fine. It is the only other full join in the file besides
+`v_budget_month`, which joins on three equalities.
+
+### Tests
+
+Four new files, and the split follows the one Phase 6 established for fuel — a hermetic file
+holding numbers a person worked out, and a database file proving the two implementations agree
+with each other and with those numbers.
+
+- `lib/recurring/cadence.test.ts` — 16 hermetic cases, almost all about the end of a month,
+  because that is the only place this arithmetic is interesting. The one worth reading: a
+  monthly template on the 31st walked through a full year lands on 28 Feb, 31 Mar, 30 Apr,
+  31 May and so on, never drifting down to the 28th and staying there — which is exactly what
+  `+ interval '1 month'` applied to the last date would do.
+- `lib/funds/projection.test.ts` — 11 hermetic cases, including a fund drawn below zero and
+  the refusal to name a date with no contribution rate.
+- `lib/recurring/cadence.db.test.ts` — the file the other two cite. Walks 22 awkward dates
+  through both implementations, then compounds twelve monthly periods and checks they still
+  agree, because one step agreeing is weaker than it looks: the interesting failure is a day
+  that drifts one place per period and only shows up months later. Also proves the catch-up
+  cap of 24, that a draft is out of `v_expense_impact`, `v_month_totals` and `v_budget_month`
+  until confirmed, and that `generate_due_recurrences` is refused to a signed-in user.
+- `lib/queries/money-tools.db.test.ts` — the acceptance criterion above, the budget views, the
+  fund projection against `v_fund_status`, all four report functions, and RLS isolation.
+
+`npm run test:db` now runs both. 178 db tests pass, 263 hermetic.
+
+### Route size
+
+Nothing near the ceiling. Every route is well under the 40KB of own JavaScript:
+
+```
+/garage/[vehicleId]        30.8KB      /money                     10.2KB
+/garage/[vehicleId]/plan   26.3KB      /money/recurring            9.2KB
+/today                     20.7KB      /money/reports              2.9KB
+/ledger                    20.0KB      /settings                   0.0KB
+```
+
+The shared baseline measured **139.7KB gzipped across eight chunks**, against the 139.4KB
+recorded in `CLAUDE.md` on 25 August 2026. That is 0.3KB of drift with no framework upgrade
+and nothing added to the shell — noise, not a change, and far below the ~10KB that would mean
+something had landed in the shell that belongs on a route. `CLAUDE.md` has not been edited for
+it; its named examples (`/ledger` at 30.6KB, `/today` at 29.6KB) are now stale in the other
+direction, both having got smaller, and updating the constitution is the owner's call.
+
+### Docs
+
+`docs/02-DATA-MODEL.md` is deliberately untouched and no schema doc debt was added.
+`budgets`, `funds`, `fund_contributions` and `recurring_expenses` were all created in
+migration 0004 and specified in that document from Phase 1; 0017 adds only views, functions
+and a schedule, so CLAUDE.md's rule 4 — a schema change means a migration plus a doc edit in
+the same commit — has nothing to bite on here. 0018 replaces a function body and changes no
+column, constraint or type.
+
+### Assumptions
+
+1. **A drawdown is capped at the fund balance, and the cap is applied on the server.** The
+   form shows what saving will take out, but the action reads the balance itself rather than
+   trusting that number. A fund can be emptied; it cannot be pushed below zero, because a
+   sinking fund with minus two million in it is not a thing that happened. A refund — a
+   negative expense — draws nothing.
+2. **The fund offer appears only in the mark-installed flow.** The ledger, quick add and every
+   edit never mention funds. Setting `fund_id` is what spends the fund, so an edit that carried
+   it would draw the money out a second time; the column is therefore create-only in the zod
+   schema, the same treatment `mod_plan_id` gets and for a sharper reason.
+3. **The catch-up cap is 24 periods.** A template with a due date left in 1970 catches up two
+   years' worth and then stops, leaving its due date where it got to rather than spinning or
+   flooding the tray with twenty thousand drafts.
+4. **A template with no amount generates nothing**, and keeps its stale due date rather than
+   being quietly moved on — so switching one back on does what it looks like it will do.
+5. **The cron endpoint decides the calendar day in Asia/Ho_Chi_Minh** rather than leaving it to
+   the database's UTC clock, so a job fired at 23:30 UTC on the 31st does not generate the 1st's
+   drafts a day early.
+
+### Where confidence is low
+
+- **The `pg_cron` schedule has not been observed firing.** `generate_due_recurrences` is tested
+  directly and thoroughly, but the 17:05 UTC schedule itself is asserted by the migration and
+  not by anything that watched a clock. It is also the piece most likely to differ between the
+  local stack and hosted Supabase.
+- **Nothing here has been used on a phone.** The arc, the fund sheet and the draft tray have
+  been built to the design and measured, not lived with.
+- **The projection is arithmetic, not a forecast**, and will look wrong to anybody who reads it
+  as one. "At 2.000.000 a month, funded by March 2027" assumes the contribution actually gets
+  made every month. Nothing in the app knows whether it will be.
+
+### What a reviewer should check first
+
+1. **`supabase db push` for `0018_report_categories_join.sql`.** 0017 is already in production
+   with a `report_categories` that throws on every call, so `/money/reports` is broken until
+   0018 lands. It replaces one function body and touches no data.
+2. **`/money/reports` after that push**, specifically the "By category" block — the section
+   that was a 500 before.
+3. **The acceptance criterion, on your own numbers.** Put a real big purchase in a month,
+   spread it, and check that the arc reads the monthly figure while the reports show both.
+   The working is above; the app should agree with your own arithmetic.
+4. **Mark a mod installed that has a fund saved up for it.** This is the path the first run
+   left disconnected, so it is the one with the least mileage on it: the offer should appear
+   switched on, the line underneath should say what saving takes out, and the fund's balance
+   and projected date should both move afterwards.
+5. **Turn that offer off before saving**, and confirm the fund is untouched and the expense
+   unflagged.
+6. **A draft in the tray on `/today`.** Set a template due today, run the endpoint by hand with
+   `CRON_SECRET`, and confirm the draft appears, counts toward nothing, edits its amount, and
+   only then lands in the ledger.
+7. **Set `CRON_SECRET` in the deployment before anything else.** Unset, the endpoint refuses
+   every request — which is the right default, but it is a 503 rather than anything louder.

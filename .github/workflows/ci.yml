@@ -41,6 +41,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # The secret key bypasses row-level security completely, and a key that
+      # has reached one browser has to be rotated. docs/05-OPS.md.
+      - name: Secret key is not reachable from client code
+        run: npm run check:secrets
+
       - name: Test
         run: npm run test
 

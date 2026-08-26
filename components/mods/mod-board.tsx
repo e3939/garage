@@ -23,6 +23,7 @@ import { Money } from '@/components/ui/money'
 import { Sheet } from '@/components/ui/sheet'
 import { useToast } from '@/components/ui/toast'
 import type { IsoDate } from '@/lib/dates'
+import type { FundOffer } from '@/lib/funds/types'
 import { applyMove, columnsOf, insertionIndex, nudge, type ModMove } from '@/lib/mods/board'
 import {
   BOARD_STATUSES,
@@ -39,7 +40,11 @@ const EDGE = 56
 /** Pixels per frame of auto-scroll. Slow enough to aim, fast enough to arrive. */
 const SPEED = 14
 
-type ExpenseProps = Omit<ExpenseFormProps, 'mode' | 'initial' | 'onDone' | 'prefill'>
+/**
+ * `fund` is omitted alongside the rest: it is not a property of the page, it is
+ * a property of the card being installed, so the board picks it per mod below.
+ */
+type ExpenseProps = Omit<ExpenseFormProps, 'mode' | 'initial' | 'onDone' | 'prefill' | 'fund'>
 
 type ModBoardProps = {
   vehicleId: string
@@ -52,6 +57,12 @@ type ModBoardProps = {
   targetLabels: Readonly<Record<string, string>>
   /** Everything the pre-filled expense form needs, fetched with the page. */
   expense: ExpenseProps
+  /**
+   * The open funds saved up for these mods, keyed by mod. A card with an entry
+   * here opens its install form offering to pay out of that fund; a card
+   * without one never mentions funds at all.
+   */
+  fundOffers: Readonly<Record<string, FundOffer>>
   /** The category a mod expense files under. Null if it has been deleted. */
   modCategoryId: string | null
 }
@@ -101,6 +112,7 @@ export function ModBoard({
   userId,
   targetLabels,
   expense,
+  fundOffers,
   modCategoryId,
 }: ModBoardProps) {
   const { show } = useToast()
@@ -509,6 +521,7 @@ export function ModBoard({
             key={installing.id}
             mode="create"
             prefill={installPrefill}
+            fund={fundOffers[installing.id] ?? null}
             onDone={() => setInstalling(null)}
             {...expense}
           />

@@ -9,6 +9,7 @@ import { todayIso } from '@/lib/dates'
 import { dateLabel } from '@/lib/dates-display'
 import { fetchRankedCategories } from '@/lib/queries/categories'
 import { fetchAmortiseThreshold } from '@/lib/queries/expenses'
+import { fetchFundOffersByMod } from '@/lib/queries/funds'
 import { fetchModBoard } from '@/lib/queries/mods'
 import { fetchProfilePreferences, fetchUserId } from '@/lib/queries/profile'
 import { fetchVehicle, fetchVehicleOptions } from '@/lib/queries/vehicles'
@@ -51,12 +52,16 @@ export default async function PlanPage({ params }: PlanPageProps) {
   const [preferences, vehicle] = await Promise.all([fetchProfilePreferences(), fetchVehicle(vehicleId)])
   if (!vehicle) notFound()
 
-  const [board, categories, vehicles, amortiseThreshold, userId] = await Promise.all([
+  const [board, categories, vehicles, amortiseThreshold, userId, fundOffers] = await Promise.all([
     fetchModBoard(vehicle.id, preferences.baseCurrency),
     fetchRankedCategories(),
     fetchVehicleOptions(),
     fetchAmortiseThreshold(),
     fetchUserId(),
+    // In parallel with the rest, not after it: the board cannot render the
+    // install sheet before it has the card anyway, and a waterfall here would
+    // cost the whole page a round trip (CLAUDE.md section 3).
+    fetchFundOffersByMod(vehicle.id),
   ])
 
   const targetLabels: Record<string, string> = {}
@@ -83,6 +88,7 @@ export default async function PlanPage({ params }: PlanPageProps) {
         today={todayIso()}
         userId={userId ?? ''}
         targetLabels={targetLabels}
+        fundOffers={fundOffers}
         modCategoryId={modCategory(categories)}
         expense={{
           userId: userId ?? '',

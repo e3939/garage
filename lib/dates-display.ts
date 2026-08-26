@@ -13,7 +13,13 @@
 
 import { format, parseISO } from 'date-fns'
 
-import { addDays, isIsoDate, todayIso, type IsoDate } from '@/lib/dates'
+import {
+  addDays,
+  addMonthsToMonthStart,
+  isIsoDate,
+  todayIso,
+  type IsoDate,
+} from '@/lib/dates'
 
 /**
  * `date-fns` parses a date-only string as local midnight, so formatting it back
@@ -49,4 +55,22 @@ export function dayHeading(date: IsoDate, today: IsoDate = todayIso()): string {
   if (date === addDays(today, -1)) return 'Yesterday'
   const sameYear = date.slice(0, 4) === today.slice(0, 4)
   return format(toDate(date), sameYear ? 'EEE d LLL' : 'EEE d LLL yyyy')
+}
+
+/**
+ * A run of month names starting at a month, keyed by month start.
+ *
+ * Handed to client components that need to print a month they will only work
+ * out in the browser — the fund sheet's projected completion date moves as the
+ * target is typed. The alternative is `date-fns` in the client bundle for the
+ * sake of twelve words. Five years is enough for any fund somebody is seriously
+ * contributing to; past that the sheet says "N months from now" instead.
+ */
+export function monthLabelsFrom(start: IsoDate, count: number): Record<string, string> {
+  const labels: Record<string, string> = {}
+  for (let index = 0; index < count; index += 1) {
+    const month = addMonthsToMonthStart(start, index)
+    labels[month] = monthLabel(month)
+  }
+  return labels
 }

@@ -4,14 +4,16 @@ import Link from 'next/link'
 import { categoryIconMap } from '@/components/expenses/category-icons'
 import { MonthTotal } from '@/components/expenses/month-total'
 import { LedgerList } from '@/components/ledger/ledger-list'
+import { DraftTray } from '@/components/recurring/draft-tray'
 import { ledgerSignalIcons } from '@/components/ledger/row-signals'
 import { ViewSwitcher } from '@/components/totals/view-switcher'
 import { monthStart, todayIso } from '@/lib/dates'
-import { monthLabel } from '@/lib/dates-display'
+import { dateLabel, monthLabel } from '@/lib/dates-display'
 import { EMPTY_FILTERS, type RawSearchParams } from '@/lib/expenses/filters'
 import { fetchRankedCategories } from '@/lib/queries/categories'
 import { fetchAmortiseThreshold, fetchLedgerPage, fetchMonthSummary } from '@/lib/queries/expenses'
 import { fetchProfilePreferences, fetchUserId } from '@/lib/queries/profile'
+import { fetchDraftExpenses } from '@/lib/queries/recurring'
 import { fetchVehicleOptions } from '@/lib/queries/vehicles'
 import { parseSpendView, SPEND_VIEW_PARAM } from '@/lib/views'
 
@@ -37,17 +39,27 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const preferences = await fetchProfilePreferences()
   const view = parseSpendView(firstParam(raw[SPEND_VIEW_PARAM]), preferences.defaultView)
 
-  const [summary, recent, categories, vehicles, amortiseThreshold, userId] = await Promise.all([
-    fetchMonthSummary(month, preferences.baseCurrency),
-    fetchLedgerPage(EMPTY_FILTERS, null, RECENT_ROWS),
-    fetchRankedCategories(),
-    fetchVehicleOptions(),
-    fetchAmortiseThreshold(),
-    fetchUserId(),
-  ])
+  const [summary, recent, categories, vehicles, amortiseThreshold, userId, drafts] =
+    await Promise.all([
+      fetchMonthSummary(month, preferences.baseCurrency),
+      fetchLedgerPage(EMPTY_FILTERS, null, RECENT_ROWS),
+      fetchRankedCategories(),
+      fetchVehicleOptions(),
+      fetchAmortiseThreshold(),
+      fetchUserId(),
+      fetchDraftExpenses(),
+    ])
+
+  // The dates the tray prints, in words, on the server. See `lib/dates-display.ts`.
+  const draftDates: Record<string, string> = {}
+  for (const draft of drafts) draftDates[draft.occurred_on] ??= dateLabel(draft.occurred_on)
 
   return (
     <div className="space-y-6">
+      {/* Above the month's figure, because it is the one thing on this screen
+          that is asking rather than telling. */}
+      <DraftTray drafts={drafts} locale={preferences.locale} dateLabels={draftDates} />
+
       <ViewSwitcher view={view} />
 
       <MonthTotal

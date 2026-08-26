@@ -5,6 +5,7 @@ import { signAttachments } from '@/lib/storage/signed-url'
 import { fetchAttachments } from '@/lib/attachments/server'
 import type { AttachmentDraft, AttachmentView } from '@/lib/attachments/types'
 import type { DependencyEdges } from '@/lib/mods/graph'
+import type { Enums } from '@/lib/supabase/types'
 import {
   BOARD_STATUSES,
   EMPTY_TOTALS,
@@ -252,4 +253,34 @@ export async function fetchInspirationPhotos(vehicleId: string): Promise<
     const title = Array.isArray(parent) ? (parent[0]?.title ?? '') : (parent?.title ?? '')
     return { ...view, mod_title: title }
   })
+}
+
+/** A mod reduced to what a fund needs to know about it: its name and its car. */
+export type ModOption = {
+  id: string
+  title: string
+  vehicle_id: string
+  status: Enums<'mod_status'>
+}
+
+/**
+ * The mods a sinking fund can be attached to.
+ *
+ * Everything still on the plan, including installed ones — a fund is often set
+ * up after the fact for the next stage of the same job, and an installed mod
+ * that has already been paid for is a perfectly reasonable thing to still be
+ * saving against. Abandoned and archived ones are left out.
+ */
+export async function fetchModOptions(): Promise<ModOption[]> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('mod_plans')
+    .select('id, title, vehicle_id, status')
+    .is('archived_at', null)
+    .neq('status', 'abandoned')
+    .order('title', { ascending: true })
+
+  if (error) throw new Error(`mod_plans failed: ${error.message}`)
+  return (data ?? []) as ModOption[]
 }

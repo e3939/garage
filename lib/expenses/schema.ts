@@ -78,6 +78,14 @@ export const expenseWriteSchema = z
     note: optionalText(2000),
     odometer_km: z.number().int().min(0).max(9_999_999).nullable().default(null),
     mod_plan_id: linkedUuid,
+    /**
+     * The sinking fund this was paid out of, which is what
+     * docs/01-PRODUCT.md calls being flagged `funded_from_fund`. Set only by
+     * the mark-installed flow, and only on a create: setting it is what draws
+     * the fund down, so an edit that carried it would draw it down twice.
+     * Absent means "do not touch", the same as `mod_plan_id`.
+     */
+    fund_id: linkedUuid,
   })
   .refine(
     (value) => (value.bucket === 'life' ? value.vehicle_id === null : value.vehicle_id !== null),
