@@ -1892,6 +1892,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["timeline_kind"] | null
           occurred_on: string | null
           ref_id: string | null
+          stamp: string | null
           subtitle: string | null
           title: string | null
           user_id: string | null
@@ -1933,6 +1934,10 @@ export type Database = {
       }
     }
     Functions: {
+      award_milestones: {
+        Args: { p_user_id: string; p_vehicle_id: string }
+        Returns: undefined
+      }
       copy_budgets_from: {
         Args: { p_from: string; p_to: string }
         Returns: number
@@ -2112,6 +2117,7 @@ export type Database = {
           occurred_on: string
           photos: Json
           ref_id: string
+          stamp: string
           subtitle: string
           title: string
           vehicle_id: string

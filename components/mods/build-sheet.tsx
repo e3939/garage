@@ -65,6 +65,7 @@ export function BuildSheet({ totals, currency, locale }: BuildSheetProps) {
           currency={currency}
           locale={locale}
           size="odometer-lg"
+          roll
         />
 
         <dl className="divide-y divide-border border-t border-border">

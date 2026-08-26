@@ -323,7 +323,7 @@ export function ModSheet({
                     <label className="flex min-h-touch cursor-pointer items-center gap-3 px-3 py-2">
                       <input
                         type="checkbox"
-                        className="size-5 accent-fire-brick"
+                        className="size-5 accent-accent"
                         checked={checked}
                         onChange={(event) =>
                           setDependsOn((previous) =>

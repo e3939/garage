@@ -15,17 +15,25 @@
  * twice as dense, and a needle in it is doing exactly what a needle in that part
  * of a rev counter does. Nothing flashes. Nothing shakes.
  *
- * A Server Component emitting SVG, so the arc costs no client JavaScript at all
- * and renders with scripting off. The sweep is two CSS animations declared in
- * globals.css: the coloured segment draws itself in with `stroke-dashoffset` and
- * the needle rotates from zero to its angle. Both are written so their final
- * state is also their static state, which is what makes reduced motion correct
- * rather than merely quiet — the global `prefers-reduced-motion` rule collapses
- * the duration to nothing and the needle is already where it belongs.
+ * A Server Component emitting SVG, so the arc costs no client JavaScript beyond
+ * the handful of lines that remember it has swept, and it renders with scripting
+ * off. The sweep is two CSS animations declared in globals.css: the coloured
+ * segment draws itself in with `stroke-dashoffset` and the needle rotates from
+ * zero to its angle. Both are written so their final state is also their static
+ * state, which is what makes reduced motion correct rather than merely quiet —
+ * the global `prefers-reduced-motion` rule collapses the duration to nothing and
+ * the needle is already where it belongs.
+ *
+ * "Once, then never again during the session" is decided here, on the server,
+ * from a session cookie. See `arc-session.ts` for why it is not decided in the
+ * browser.
  */
 
+import { cookies } from 'next/headers'
 import type { CSSProperties } from 'react'
 
+import { ARC_SWEPT_COOKIE } from '@/components/budget/arc-session'
+import { MarkArcSwept } from '@/components/budget/mark-arc-swept'
 import { budgetState, BUDGET_STATE_COLOUR } from '@/lib/budgets/types'
 
 /** 240 degrees, from lower-left round the top to lower-right. */
@@ -88,7 +96,14 @@ type BudgetArcProps = {
   size?: number
 }
 
-export function BudgetArc({ fraction, label, reading, caption, size = 208 }: BudgetArcProps) {
+export async function BudgetArc({
+  fraction,
+  label,
+  reading,
+  caption,
+  size = 208,
+}: BudgetArcProps) {
+  const swept = (await cookies()).has(ARC_SWEPT_COOKIE)
   const state = budgetState({ budget_amount: 1, used_fraction: fraction })
   const colour = BUDGET_STATE_COLOUR[state]
   const angle = sweepFor(fraction)
@@ -97,89 +112,92 @@ export function BudgetArc({ fraction, label, reading, caption, size = 208 }: Bud
   const length = (angle / SWEEP) * 100
 
   return (
-    <svg
-      viewBox="0 0 200 140"
-      width={size}
-      height={(size * 140) / 200}
-      role="img"
-      aria-label={label}
-      className="shrink-0"
-      style={
-        {
-          '--arc-length': length.toFixed(2),
-          '--arc-angle': `${angle.toFixed(2)}deg`,
-        } as CSSProperties
-      }
-    >
-      <path d={ARC} fill="none" stroke="var(--rule)" strokeWidth={BAND} strokeLinecap="round" />
+    <>
+      <svg
+        viewBox="0 0 200 140"
+        width={size}
+        height={(size * 140) / 200}
+        role="img"
+        aria-label={label}
+        className={swept ? 'shrink-0' : 'arc-sweep shrink-0'}
+        style={
+          {
+            '--arc-length': length.toFixed(2),
+            '--arc-angle': `${angle.toFixed(2)}deg`,
+          } as CSSProperties
+        }
+      >
+        <path d={ARC} fill="none" stroke="var(--rule)" strokeWidth={BAND} strokeLinecap="round" />
 
-      <g strokeLinecap="butt">
-        {ticks().map((tick) => {
-          const at = START + sweepFor(tick.fraction)
-          const redline = tick.fraction === 1
-          const inner = redline ? REDLINE_INNER : TICK_INNER
-          const from = point(at, inner)
-          const to = point(at, TICK_OUTER)
-          return (
-            <line
-              key={tick.fraction}
-              x1={from.x.toFixed(2)}
-              y1={from.y.toFixed(2)}
-              x2={to.x.toFixed(2)}
-              y2={to.y.toFixed(2)}
-              stroke={redline ? 'var(--critical)' : 'var(--rule-strong)'}
-              strokeWidth={redline ? 2.5 : tick.dense ? 1 : 1.5}
-            />
-          )
-        })}
-      </g>
+        <g strokeLinecap="butt">
+          {ticks().map((tick) => {
+            const at = START + sweepFor(tick.fraction)
+            const redline = tick.fraction === 1
+            const inner = redline ? REDLINE_INNER : TICK_INNER
+            const from = point(at, inner)
+            const to = point(at, TICK_OUTER)
+            return (
+              <line
+                key={tick.fraction}
+                x1={from.x.toFixed(2)}
+                y1={from.y.toFixed(2)}
+                x2={to.x.toFixed(2)}
+                y2={to.y.toFixed(2)}
+                stroke={redline ? 'var(--critical)' : 'var(--rule-strong)'}
+                strokeWidth={redline ? 2.5 : tick.dense ? 1 : 1.5}
+              />
+            )
+          })}
+        </g>
 
-      <path
-        className="arc-fill"
-        d={ARC}
-        fill="none"
-        stroke={colour}
-        strokeWidth={BAND}
-        strokeLinecap="round"
-        pathLength={100}
-        strokeDasharray={`${length.toFixed(2)} 100`}
-      />
-
-      {/* Drawn at the zero position and rotated into place, so the animation and
-          the resting state are the same declaration. */}
-      <g className="arc-needle">
-        <line
-          x1={point(START + 180, NEEDLE_TAIL).x.toFixed(2)}
-          y1={point(START + 180, NEEDLE_TAIL).y.toFixed(2)}
-          x2={point(START, NEEDLE_TIP).x.toFixed(2)}
-          y2={point(START, NEEDLE_TIP).y.toFixed(2)}
-          stroke="var(--text)"
-          strokeWidth={2.5}
+        <path
+          className="arc-fill"
+          d={ARC}
+          fill="none"
+          stroke={colour}
+          strokeWidth={BAND}
           strokeLinecap="round"
+          pathLength={100}
+          strokeDasharray={`${length.toFixed(2)} 100`}
         />
-        <circle cx={CX} cy={CY} r={5} fill="var(--surface)" stroke="var(--text)" strokeWidth={2} />
-      </g>
 
-      {/* The reading sits in the dial's own middle. Mono and tabular, like every
-          number in this app — the per-cent sign is in the subset. */}
-      <text
-        x={CX}
-        y={CY + 10}
-        textAnchor="middle"
-        fill="var(--text)"
-        style={{ font: '500 30px var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}
-      >
-        {reading}
-      </text>
-      <text
-        x={CX}
-        y={CY + 28}
-        textAnchor="middle"
-        fill="var(--text-muted)"
-        style={{ font: '400 12px var(--font-body)' }}
-      >
-        {caption}
-      </text>
-    </svg>
+        {/* Drawn at the zero position and rotated into place, so the animation and
+            the resting state are the same declaration. */}
+        <g className="arc-needle">
+          <line
+            x1={point(START + 180, NEEDLE_TAIL).x.toFixed(2)}
+            y1={point(START + 180, NEEDLE_TAIL).y.toFixed(2)}
+            x2={point(START, NEEDLE_TIP).x.toFixed(2)}
+            y2={point(START, NEEDLE_TIP).y.toFixed(2)}
+            stroke="var(--text)"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+          />
+          <circle cx={CX} cy={CY} r={5} fill="var(--surface)" stroke="var(--text)" strokeWidth={2} />
+        </g>
+
+        {/* The reading sits in the dial's own middle. Mono and tabular, like every
+            number in this app — the per-cent sign is in the subset. */}
+        <text
+          x={CX}
+          y={CY + 10}
+          textAnchor="middle"
+          fill="var(--text)"
+          style={{ font: '500 30px var(--font-mono)', fontVariantNumeric: 'tabular-nums' }}
+        >
+          {reading}
+        </text>
+        <text
+          x={CX}
+          y={CY + 28}
+          textAnchor="middle"
+          fill="var(--text-muted)"
+          style={{ font: '400 12px var(--font-body)' }}
+        >
+          {caption}
+        </text>
+      </svg>
+      {swept ? null : <MarkArcSwept />}
+    </>
   )
 }

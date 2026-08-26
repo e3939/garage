@@ -191,7 +191,7 @@ export function BudgetEditor({
                           autoComplete="off"
                           placeholder="No cap"
                           aria-label={`Cap on ${category.name}`}
-                          className={`${INPUT_CLASS} w-32 shrink-0 text-right font-mono`}
+                          className={`${INPUT_CLASS} w-amount shrink-0 text-right font-mono`}
                           value={text}
                           onChange={(event) =>
                             setCapText((previous) => ({

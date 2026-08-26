@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { hashString, tiltFor, tornEdgeFor } from '@/lib/timeline/tilt'
+import { hashString, stampRotationFor, tiltFor, tornEdgeFor } from '@/lib/timeline/tilt'
 
 /**
  * The tilt has to be a property of the row rather than of the moment it was
@@ -80,5 +80,38 @@ describe('tornEdgeFor', () => {
 
   it('gives the same answer every time', () => {
     for (const id of IDS) expect(tornEdgeFor(id)).toBe(tornEdgeFor(id))
+  })
+})
+
+describe('stampRotationFor', () => {
+  it('leans left, between one and five degrees', () => {
+    // docs/03-DESIGN.md puts the stamp at -3. A stamp that came out upright, or
+    // leaning the other way from the one above it, stops reading as ink on
+    // paper and starts reading as a badge.
+    for (const id of IDS) {
+      const rotation = stampRotationFor(id)
+      expect(rotation).toBeLessThan(0)
+      expect(rotation).toBeGreaterThanOrEqual(-5)
+      expect(rotation).toBeLessThanOrEqual(-1)
+    }
+  })
+
+  it('varies down a feed', () => {
+    expect(new Set(IDS.map((id) => stampRotationFor(id))).size).toBeGreaterThan(3)
+  })
+
+  it('averages the design\'s -3', () => {
+    const mean = IDS.reduce((sum, id) => sum + stampRotationFor(id), 0) / IDS.length
+    expect(mean).toBeGreaterThan(-3.8)
+    expect(mean).toBeLessThan(-2.2)
+  })
+
+  it('does not move in lockstep with the tilt', () => {
+    const pairs = new Set(IDS.map((id) => `${stampRotationFor(id)}:${tiltFor(id)}`))
+    expect(pairs.size).toBeGreaterThan(6)
+  })
+
+  it('gives the same answer every time', () => {
+    for (const id of IDS) expect(stampRotationFor(id)).toBe(stampRotationFor(id))
   })
 })

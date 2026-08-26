@@ -230,12 +230,16 @@ describe.skipIf(!ENABLED)('local stack', () => {
     })
     aliceRows.timeline_notes = [note.id as string]
 
+    // Manual, not automatic. Since migration 0019 the expense inserted above
+    // awards `first_expense` on its own, and a second one would collide with
+    // `milestones_auto_key` — which is the index doing its job, not a failure.
     const milestone = await insert(alice, 'milestones', {
       user_id: alice.id,
       vehicle_id: vehicleId,
-      kind: 'first_expense',
+      kind: 'custom',
       achieved_on: '2026-08-25',
-      title: 'First expense',
+      title: 'RLS probe milestone',
+      auto: false,
     })
     aliceRows.milestones = [milestone.id as string]
 

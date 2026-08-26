@@ -13,6 +13,7 @@ function row(partial: Partial<TimelineRow> & { ref_id: string; occurred_on: stri
     amount: null,
     currency: null,
     vehicle_id: 'vehicle-1',
+    stamp: null,
     items: [],
     photos: [],
     ...partial,

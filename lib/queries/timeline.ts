@@ -45,6 +45,7 @@ type RawRow = {
   vehicle_id: string
   items: unknown
   photos: unknown
+  stamp: string | null
 }
 
 /**
@@ -98,6 +99,7 @@ export async function fetchTimelinePage(
     amount: row.amount,
     currency: row.currency,
     vehicle_id: row.vehicle_id,
+    stamp: row.stamp ?? null,
     items: fills(row.items),
     photos: photos(row.photos)
       .map((photo) => byId.get(photo.id))

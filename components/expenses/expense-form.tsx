@@ -416,7 +416,7 @@ export function ExpenseForm({
             <label className="flex min-h-touch cursor-pointer items-center gap-3">
               <input
                 type="checkbox"
-                className="size-5 accent-fire-brick"
+                className="size-5 accent-accent"
                 checked={useFund}
                 onChange={(event) => setUseFund(event.target.checked)}
               />

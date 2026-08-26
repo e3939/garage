@@ -63,7 +63,7 @@ export function CategoryBreakdown({ rows, currency, locale, icons }: CategoryBre
               />
             </div>
 
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken">
+            <div className="h-1 w-full overflow-hidden rounded-full bg-surface-sunken">
               <div
                 className="h-full rounded-full"
                 style={{ width: `${width.toFixed(1)}%`, backgroundColor: colour }}

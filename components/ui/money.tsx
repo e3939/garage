@@ -1,3 +1,4 @@
+import { Odometer } from '@/components/ui/odometer'
 import { formatMoney } from '@/lib/money'
 
 type MoneyProps = {
@@ -9,6 +10,15 @@ type MoneyProps = {
   size?: 'odometer' | 'odometer-lg' | 'body' | 'label'
   className?: string
   signDisplay?: 'auto' | 'always' | 'never' | 'exceptZero'
+  /**
+   * Render on the odometer drum, so the digits roll when the figure changes.
+   *
+   * Off by default and switched on deliberately, because docs/03-DESIGN.md names
+   * the five figures that get it — monthly total, cost per km, total invested,
+   * fund progress, build-sheet total — and then says everything else stays
+   * quiet so that lands. A ledger of sixty rolling rows is the failure mode.
+   */
+  roll?: boolean
 }
 
 const SIZE_CLASS = {
@@ -30,10 +40,13 @@ export function Money({
   size = 'odometer',
   className = '',
   signDisplay,
+  roll = false,
 }: MoneyProps) {
+  const text = formatMoney(amount, currency, { locale, signDisplay })
+
   return (
     <span className={`whitespace-nowrap font-mono ${SIZE_CLASS[size]} ${className}`}>
-      {formatMoney(amount, currency, { locale, signDisplay })}
+      {roll ? <Odometer value={text} /> : text}
     </span>
   )
 }

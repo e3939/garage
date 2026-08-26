@@ -156,7 +156,7 @@ function CapRow({
       </div>
 
       <div
-        className="h-1.5 w-full overflow-hidden rounded-full bg-surface-sunken"
+        className="h-1 w-full overflow-hidden rounded-full bg-surface-sunken"
         role="img"
         aria-label={`${Math.round(fraction * 100)} per cent of the cap used`}
       >

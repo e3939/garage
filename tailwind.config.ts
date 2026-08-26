@@ -68,6 +68,11 @@ const config: Config = {
       touch: 'var(--touch-min)',
       nav: 'var(--nav-height)',
       fab: 'var(--fab-size)',
+      // A list thumbnail and a numeric field that must not stretch. Both are
+      // objects with a size rather than gaps between things, which is why they
+      // are here and not on the 4/8/12/16/20/24/32/48 scale.
+      thumb: 'var(--thumb-size)',
+      amount: 'var(--amount-field)',
     },
 
     borderRadius: {

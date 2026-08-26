@@ -42,6 +42,15 @@ export type TimelineRow = {
   amount: number | null
   currency: string | null
   vehicle_id: string
+  /**
+   * The dealer stamp's caption, or null for a row that is not stamped.
+   *
+   * docs/03-DESIGN.md, signature element 3: milestones and installed mods
+   * render as a stamp. `v_timeline` decides which — a milestone carries its own
+   * title, an installed mod carries "Installed" — so the feed never has to
+   * recognise a status by reading the subtitle it happens to print today.
+   */
+  stamp: string | null
   items: TimelineFill[]
   photos: AttachmentView[]
 }

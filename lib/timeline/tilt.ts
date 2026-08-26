@@ -46,3 +46,22 @@ export function tornEdgeFor(id: string): TornEdge {
   // and produce only four visible combinations instead of twenty-four.
   return EDGES[hashString(`${id}:edge`) % EDGES.length] as TornEdge
 }
+
+/**
+ * The rotation on a dealer stamp.
+ *
+ * docs/03-DESIGN.md, signature element 3: the stamp is "a rotated (-3 degree)
+ * rounded-rect outline", and "each stamp's rotation is derived from its id so
+ * it's stable across renders but varied down the feed". Both sentences at once,
+ * so these six sit around -3 rather than anywhere: a feed of stamps all at
+ * exactly -3 reads as a component, and one at -3 and the next at +4 reads as a
+ * bug. Mean of the six is -3.
+ *
+ * Seeded differently again from the tilt and the edge, so a photograph and the
+ * stamp above it do not lean by the same amount.
+ */
+const STAMP_ROTATIONS = [-4.5, -4, -3.5, -2.5, -2, -1.5] as const
+
+export function stampRotationFor(id: string): number {
+  return STAMP_ROTATIONS[hashString(`${id}:stamp`) % STAMP_ROTATIONS.length] as number
+}

@@ -47,7 +47,7 @@ export function VehicleCard({
     >
       <div className="flex items-center gap-3 p-3">
         <span
-          className="relative w-20 shrink-0 overflow-hidden rounded-sm bg-surface-sunken"
+          className="relative w-thumb shrink-0 overflow-hidden rounded-sm bg-surface-sunken"
           style={{ aspectRatio: '16 / 9' }}
         >
           {heroUrl ? (

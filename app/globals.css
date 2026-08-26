@@ -38,15 +38,26 @@
     --text-faint: var(--ink-faint);
     --accent: var(--fire-brick);
     --accent-ink: #fffdf7;
-    --positive: var(--fire-green);
+    /* Not `var(--fire-green)`, and this is the one place the semantic layer
+       parts company with the source palette on paper.
+
+       docs/03-DESIGN.md sets a 4.5:1 floor for body text and gives the source
+       green as #578769, which is 4.07:1 on a card — under its own floor. Green
+       is not decorative here: it is the "2.000.000 left" figure, the refund
+       amount in the ledger and the running-cost bucket chip, all of them words.
+       So the source stays exactly as the document draws it and the *semantic*
+       positive is the same hue and saturation taken down far enough to clear
+       the floor on paper, on a card and on the odometer bed. Verified by
+       `npm run check:contrast`. */
+    --positive: #4a7259;
     --attention: var(--fire-amber);
     --critical: var(--fire-ember);
     --highlight: var(--fire-cream);
 
     /* --- Bucket colours. The app's core vocabulary; identical everywhere. */
     --bucket-life: var(--ink-soft);
-    --bucket-car-running: var(--fire-green);
-    --bucket-car-project: var(--fire-brick);
+    --bucket-car-running: var(--positive);
+    --bucket-car-project: var(--accent);
 
     /* --- Typography. Faces come from next/font in app/fonts.ts. */
     --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
@@ -93,6 +104,8 @@
     --nav-height: 64px;
     --fab-size: 56px;
     --touch-min: 44px;
+    --thumb-size: 80px;
+    --amount-field: 128px;
 
     /* --- Elevation is rules and tint. Exactly one shadow token exists. */
     --shadow-sheet: 0 -8px 32px rgba(42, 38, 32, 0.12);
@@ -104,6 +117,72 @@
     --duration-arc: 600ms;
     --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
     --ease-exit: ease-out;
+  }
+
+  /* -------------------------------------------------------------------------
+     Dark mode. docs/03-DESIGN.md: "build it, ship it in Phase 8, don't design
+     for it first. The ink-on-paper metaphor inverts to a dark garage:
+     --bg: #211E1A, --surface: #2A2620, paper warmth kept, green and amber
+     lifted ~12% in lightness, brick lifted to #C4633F for contrast."
+
+     Two rules shape everything below.
+
+     The **derived neutrals** invert, and the semantic aliases above are left
+     alone. `--surface` is still `var(--paper-raise)`; what changes is what
+     paper-raise means. That keeps one mapping rather than two, and it means a
+     component reaching past the semantic layer for `--rule` — `.panel-sunken`
+     does, and it is right to — follows without being listed here. The names now
+     read oddly: `--ink` is the lightest colour on the screen. That is what
+     inverting a metaphor costs, and renaming eleven tokens across a codebase to
+     avoid it would cost more.
+
+     The **source palette does not move.** Firenze is the source; a source that
+     changed with the theme would not be one. What lifts is the *semantic* use
+     of it — the accent, the positive, the attention and the critical states are
+     given their own values here, because those are the ones that have to carry
+     text and strokes against a dark surface. The stamp keeps raw brick on raw
+     cream and looks identical in both modes, which is what a stamp does: it is
+     ink on its own piece of paper and brings its own contrast with it.
+     ------------------------------------------------------------------------- */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      /* Form controls, scrollbars and the caret follow this without being told. */
+      color-scheme: dark;
+
+      --paper: #211e1a;
+      --paper-raise: #2a2620;
+      /* Recessed means darker here, not lighter: the odometer bed is a hole in
+         the surface either way round. */
+      --paper-sink: #191612;
+      --rule: #494134;
+      --rule-strong: #625843;
+      --ink: #f2ebd9;
+      --ink-soft: #b5ab98;
+      --ink-faint: #8d8474;
+
+      /* docs/03-DESIGN.md names #C4633F here. That is 3.73:1 as text on
+         `--surface`, and the accent is text as often as it is a fill — every
+         "Start a fund" and "Open the ledger" on the app is `text-accent`. This
+         is the document's brick carried a little further up the same hue and
+         saturation until it clears the document's own 4.5:1 floor. */
+      --accent: #cc795a;
+      /* Near-black rather than near-white: lifted brick is light enough that
+         paper on it fails the floor and ink on it clears it comfortably. */
+      --accent-ink: #1a1713;
+      --positive: #7fb08f;
+      --attention: #f8cd8e;
+      --critical: #ef7a4a;
+
+      /* Buckets follow the lifted values rather than the raw ramp, because a
+         bucket chip is a word in that colour and words have a contrast floor. */
+      --bucket-life: var(--ink-soft);
+      --bucket-car-running: var(--positive);
+      --bucket-car-project: var(--accent);
+
+      /* A sheet lifting off a dark garage floor needs a darker shadow than one
+         lifting off paper, or it does not lift at all. */
+      --shadow-sheet: 0 -8px 32px rgba(0, 0, 0, 0.55);
+    }
   }
 
   @media (min-width: 430px) {
@@ -207,7 +286,11 @@
 
   /* Keyboard focus is visible everywhere. Quality floor, docs/03-DESIGN.md. */
   :focus-visible {
-    outline: 2px solid var(--fire-green);
+    /* `--positive` rather than `--fire-green`: the two are the same colour on
+       paper, and in the dark garage this is the lifted one, which is the only
+       version of it that clears 3:1 against the background it has to be seen
+       against. */
+    outline: 2px solid var(--positive);
     outline-offset: 2px;
   }
 
@@ -264,6 +347,12 @@
 
   .sheet::backdrop {
     background-color: rgba(42, 38, 32, 0.32);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .sheet::backdrop {
+      background-color: rgba(0, 0, 0, 0.6);
+    }
   }
 
   .sheet[open] {
@@ -380,6 +469,23 @@
      --------------------------------------------------------------------- */
   .arc-fill {
     stroke-dashoffset: 0;
+  }
+
+  /* Only a dial that has been told to sweep sweeps. `.arc-sweep` is put on the
+     svg by the server, and only when the session cookie says this browsing
+     session has not seen the needle move yet — "600ms, once, then never again
+     during the session" is a session-wide claim, and a CSS animation on its own
+     would restart it on every navigation back to this screen.
+
+     The data attribute covers the other half: a client-side navigation does not
+     re-run the server, so the component sets it once the sweep is spent and any
+     dial rendered after that in the same session is already at rest. */
+  [data-arc-swept] .arc-sweep .arc-fill,
+  [data-arc-swept] .arc-sweep .arc-needle {
+    animation: none;
+  }
+
+  .arc-sweep .arc-fill {
     animation: arc-fill var(--duration-arc) var(--ease-enter) 1 both;
   }
 
@@ -396,6 +502,9 @@
     transform-box: view-box;
     transform-origin: 100px 92px;
     transform: rotate(var(--arc-angle, 0deg));
+  }
+
+  .arc-sweep .arc-needle {
     animation: arc-needle var(--duration-arc) var(--ease-enter) 1 both;
   }
 
@@ -427,7 +536,11 @@
     border: 0;
     border-radius: 0;
     background-color: #16130f;
-    color: var(--paper);
+    /* Written out rather than taken from the ramp. The viewer is dark in both
+       modes — a photograph judged against ivory reads warmer than it is — so
+       its chrome cannot follow a token that inverts, or the counter and the
+       caption disappear into the backdrop the moment the phone goes dark. */
+    color: #fbf7ec;
     overflow: hidden;
   }
 
@@ -501,11 +614,11 @@
      photograph". */
   .viewer-chrome {
     background-color: rgba(22, 19, 15, 0.66);
-    color: var(--paper);
+    color: #fbf7ec;
   }
 
   .viewer-text {
-    color: var(--paper);
+    color: #fbf7ec;
   }
 
   .viewer-frame {
@@ -583,6 +696,185 @@
      transforms are unwelcome. The drag itself is not motion the app chose. */
   @media (prefers-reduced-motion: reduce) {
     .board-ghost {
+      transform: none;
+    }
+  }
+}
+
+@layer components {
+  /* ---------------------------------------------------------------------
+     The odometer strip. docs/03-DESIGN.md, signature element 1:
+
+       "Hero figures sit on a recessed --paper-sink panel with hairline top and
+        bottom rules, digits in tabular mono, separated by faint vertical
+        hairlines every three digits like a mechanical counter's drum gaps. When
+        the value changes, digits roll vertically — 120ms per digit, staggered
+        20ms right-to-left, cubic-bezier(0.22, 1, 0.36, 1). Respects
+        prefers-reduced-motion by cross-fading instead."
+
+     The bed is `.panel-sunken`, which has been here since Phase 0. This is the
+     drum: one cell per character, a hairline where a thousands separator would
+     have been printed, and a two-high stack inside each cell that translates by
+     exactly one digit when the figure changes.
+
+     The awkward part is the baseline. An inline-block with `overflow: hidden`
+     takes its baseline from its bottom margin edge rather than from its text,
+     so a row of clipped cells would sit a descender lower than the "/km" beside
+     it. The clipping therefore happens on an absolutely-positioned window
+     inside the cell, and the cell's own baseline comes from a hidden copy of the
+     character in normal flow. The cell is a normal inline-block; only the window
+     clips.
+     --------------------------------------------------------------------- */
+  .odometer {
+    display: inline-flex;
+    align-items: baseline;
+    /* Deterministic, because the cell height and the roll distance are both
+       one line box and the digits inside have to land on the same one. */
+    line-height: 1.2;
+  }
+
+  .odometer-cell {
+    position: relative;
+    display: inline-block;
+  }
+
+  /* Sets the width and, more to the point, the baseline. */
+  .odometer-ghost {
+    visibility: hidden;
+  }
+
+  .odometer-window {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+
+  .odometer-roll {
+    display: grid;
+    grid-template-rows: 1fr 1fr;
+    height: 200%;
+    animation: odometer-roll var(--duration-state) var(--ease-enter) both;
+    animation-delay: var(--roll-delay, 0ms);
+  }
+
+  @keyframes odometer-roll {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(-50%);
+    }
+  }
+
+  /* The drum gap. A mechanical counter has a seam between its wheels; the
+     figure already groups every three digits, so the seam goes where the
+     separator would have been printed and the separator itself goes away. */
+  .odometer-gap {
+    position: relative;
+    display: inline-block;
+    width: 0.32em;
+  }
+
+  .odometer-gap::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0.1em;
+    bottom: 0.22em;
+    width: 1px;
+    background-color: var(--rule-strong);
+  }
+
+  /* Reduced motion cross-fades, which is what the design asks for and is not
+     what the global rule above would give on its own: that rule collapses every
+     animation to 0.01ms, so the roll would simply snap. Here the stack is
+     parked on the new digit and the two are laid over each other instead, so
+     one fades out as the other fades in. Opacity only, no transform. */
+  @media (prefers-reduced-motion: reduce) {
+    .odometer-roll {
+      display: block;
+      height: 100%;
+      transform: none;
+      animation: none !important;
+    }
+
+    .odometer-roll > * {
+      position: absolute;
+      inset: 0;
+    }
+
+    .odometer-roll > :first-child {
+      animation: odometer-out var(--duration-state) ease-out both !important;
+    }
+
+    .odometer-roll > :last-child {
+      animation: odometer-in var(--duration-state) ease-out both !important;
+    }
+  }
+
+  @keyframes odometer-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes odometer-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* ---------------------------------------------------------------------
+     The stamp. docs/03-DESIGN.md, signature element 3:
+
+       "Milestones and installed mods render in the timeline as a rotated (-3
+        degree) rounded-rect outline in --fire-brick on --fire-cream, with
+        eyebrow-set text inside — a dealer stamp. Slight ink-density texture via
+        a low-opacity noise layer. Each stamp's rotation is derived from its id
+        so it's stable across renders but varied down the feed."
+
+     Brick and cream are named here as the source tokens rather than as
+     `--accent` and `--highlight`, and that is deliberate: in dark mode the
+     accent lifts for contrast against a dark surface, but a stamp is ink on its
+     own piece of cream paper and carries its own contrast with it. It looks the
+     same in both modes, which is what a stamp does.
+
+     The noise is one fractal-noise tile multiplied over the whole stamp, text
+     included, at an opacity low enough to read as uneven ink rather than as a
+     texture. It is not decoration behind the words; a real stamp is heavier
+     where the pad was wet.
+     --------------------------------------------------------------------- */
+  .stamp {
+    position: relative;
+    overflow: hidden;
+    border: 2px solid var(--fire-brick);
+    border-radius: var(--r-sm);
+    background-color: var(--fire-cream);
+    color: var(--fire-brick);
+    transform: rotate(var(--stamp-rotation, -3deg));
+  }
+
+  .stamp::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.28;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2280%22%20height%3D%2280%22%3E%3Cfilter%20id%3D%22n%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.85%22%20numOctaves%3D%223%22%20stitchTiles%3D%22stitch%22%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%2280%22%20height%3D%2280%22%20filter%3D%22url(%23n)%22%2F%3E%3C%2Fsvg%3E");
+    background-size: 80px 80px;
+  }
+
+  /* The lean is a transform like the torn thumbnail's tilt, and it goes the
+     same way when transforms are unwelcome. */
+  @media (prefers-reduced-motion: reduce) {
+    .stamp {
       transform: none;
     }
   }

@@ -26,8 +26,8 @@ type StatProps = {
 /**
  * A figure on the odometer strip: a recessed panel with hairline rules, the
  * label above in eyebrow caps, the number in tabular mono (docs/03-DESIGN.md,
- * signature element 1). The digits do not roll yet — that is roadmap Phase 8 —
- * but the bed they will roll on is here.
+ * signature element 1). The digits roll when the figure changes: 120ms each,
+ * staggered from the right, cross-faded instead when motion is unwelcome.
  *
  * `hero` is the one big figure a screen is allowed. `panel` is everything else.
  */
@@ -92,7 +92,7 @@ export function Total({
         </span>
       ) : (
         <span className="inline-flex items-baseline">
-          <Money amount={amount} currency={currency} locale={locale} size={size} />
+          <Money amount={amount} currency={currency} locale={locale} size={size} roll />
           {suffix ? <span className="font-mono text-label text-ink-muted">{suffix}</span> : null}
         </span>
       )}

@@ -4,6 +4,7 @@
 
 import type { ReactNode } from 'react'
 
+import { Stamp } from '@/components/timeline/stamp'
 import { Thumbnail } from '@/components/attachments/thumbnail'
 import { Money } from '@/components/ui/money'
 import type { TimelineRow } from '@/lib/timeline/types'
@@ -32,6 +33,14 @@ type TimelineRowCardProps = {
  * variable height, so the ledger's measured virtualisation does not apply to it;
  * this hands the same job to the browser, which skips rendering and layout for
  * anything off screen and still reports an honest scroll height.
+ *
+ * Two kinds of row are stamped (docs/03-DESIGN.md, signature element 3). A
+ * milestone *is* the stamp: it has no amount, nothing to tap and nothing to
+ * truncate, so the stamp is its headline and its body sits underneath. An
+ * installed mod is an ordinary row that has had something done to it, so the
+ * stamp goes where its subtitle would have said "Installed" in plain text. The
+ * caption comes from `v_timeline`, so neither case is decided by recognising a
+ * string the feed happens to print today.
  */
 export function TimelineRowCard({
   row,
@@ -42,13 +51,27 @@ export function TimelineRowCard({
   onOpen,
 }: TimelineRowCardProps) {
   const showAmount = row.amount !== null && row.currency !== null
+  const milestone = row.kind === 'milestone'
 
   // The title is the control, not the whole row: the photographs underneath are
   // buttons of their own and a button cannot contain a button.
-  const heading = (
+  const heading = milestone ? (
+    <>
+      <Stamp id={row.ref_id} size="lg">
+        {row.stamp ?? row.title}
+      </Stamp>
+      {row.subtitle ? (
+        <span className="mt-2 block text-caption text-ink-muted">{row.subtitle}</span>
+      ) : null}
+    </>
+  ) : (
     <>
       <span className="block truncate text-body text-ink">{row.title}</span>
-      {row.subtitle ? (
+      {row.stamp ? (
+        <span className="mt-1 block">
+          <Stamp id={row.ref_id}>{row.stamp}</Stamp>
+        </span>
+      ) : row.subtitle ? (
         <span className="block truncate text-caption text-ink-muted">{row.subtitle}</span>
       ) : null}
     </>

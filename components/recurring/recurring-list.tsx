@@ -105,7 +105,7 @@ export function RecurringList({
                       />
                     )}
                   </span>
-                  <span className="mt-0.5 block truncate text-caption text-ink-muted">
+                  <span className="mt-1 block truncate text-caption text-ink-muted">
                     {CADENCE_LABEL[template.cadence]}
                     {template.category_name ? ` · ${template.category_name}` : null}
                     {template.vehicle_nickname ? ` · ${template.vehicle_nickname}` : null}
@@ -119,7 +119,7 @@ export function RecurringList({
                   <span className="sr-only">{`${template.label} is running`}</span>
                   <input
                     type="checkbox"
-                    className="size-5 accent-fire-brick"
+                    className="size-5 accent-accent"
                     checked={template.active}
                     onChange={() => void toggle(template)}
                   />

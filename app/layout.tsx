@@ -34,7 +34,12 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#FBF7EC',
+  // The browser chrome follows the app rather than the other way round. Both
+  // values are the `--paper` token in each mode; if one moves, move the other.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#FBF7EC' },
+    { media: '(prefers-color-scheme: dark)', color: '#211E1A' },
+  ],
 }
 
 export default function RootLayout({
