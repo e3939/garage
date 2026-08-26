@@ -320,6 +320,18 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+
+    /* docs/03-DESIGN.md is stricter than "make it fast": reduced motion
+       disables "all transforms — opacity only". The press feedback on a button
+       is a scale, and collapsing its duration leaves it snapping between two
+       sizes rather than not moving. The opacity rule below it is already
+       carrying the feedback on its own. */
+    button:active,
+    a:active,
+    summary:active,
+    [role='button']:active {
+      transform: none !important;
+    }
   }
 }
 

@@ -2411,3 +2411,343 @@ column, constraint or type.
    only then lands in the ledger.
 7. **Set `CRON_SECRET` in the deployment before anything else.** Unset, the endpoint refuses
    every request — which is the right default, but it is a 503 rather than anything louder.
+
+---
+
+## Phase 9 — Polish
+
+Branch: `feat/09-polish` (the roadmap calls this Phase 8, "Polish"; the heading follows the
+branch number so the sections in this file stay in order, as in every phase before it).
+
+### What was built
+
+- **The odometer strip rolls.** One cell per character on the hero figures, the old digit
+  above the new, 120ms each and staggered 20ms from the right so the units column moves first
+  like a mechanical counter. Thousands separators are not printed at all — they become the
+  faint vertical seams `docs/03-DESIGN.md` calls drum gaps — and under `prefers-reduced-motion`
+  the stack parks on the new digit and the two cross-fade instead, which is a real cross-fade
+  rather than the snap the global rule would otherwise produce.
+- **The arc sweeps once a session, and stamps arrive with the milestones they announce.**
+  The sweep is now decided on the server from a session cookie rather than by a CSS animation
+  that restarts on every mount. Migration 0019 adds `award_milestones`, which implements all
+  seven automatic milestones from `docs/01-PRODUCT.md` section H and is idempotent enough to
+  be called after every write, and adds a `stamp` column to `v_timeline` so the feed knows an
+  installed mod by a column rather than by the subtitle string it happens to print. A stamp is
+  brick on cream with fractal-noise ink density and a lean derived from the row id.
+- **Dark mode.** The derived neutrals invert and the semantic aliases above them are left
+  alone, so `--surface` is still `var(--paper-raise)` and only what paper-raise *means*
+  changes. The source palette does not move; what lifts is the semantic use of it. A new
+  `npm run check:contrast` reads the tokens straight out of `globals.css`, resolves the
+  `var()` chains and checks 48 real pairs in both modes — it found that the document's own
+  green was 4.07:1 as text on paper and that the tertiary ink was 2.63:1 on the odometer bed.
+- **The quality floor.** One `<EmptyState>` in the shape the design specifies, replacing
+  eleven paragraphs that each invented their own; skeletons in `--paper-sink` with no shimmer,
+  built from the same padding as the panels they stand in for; Undo on the six hard deletes
+  that had none, through a snapshot mechanism rather than six restore actions; two error
+  boundaries; and the two looping spinners on the sign-in form removed, because nothing in
+  this app loops.
+- **Resilience, and a Lighthouse run that found real bugs.** A write that never reaches the
+  server now offers Retry rather than naming an exception, the quick-add sheet keeps what was
+  typed until the *server* confirms it rather than until the sheet closes, and
+  `npm run lighthouse` signs a throwaway user in the way the app does, seeds a month of data
+  and measures the six routes that matter. It found the service worker had never installed
+  and there was no robots.txt — both were behind the auth proxy.
+
+### The migration
+
+**Yes: `supabase/migrations/0019_milestones_and_stamps.sql` needs pushing before this
+deploys.** It replays clean from zero and it is additive — no table changes, no new columns on
+any table, no new enums — but it is not optional, because `timeline_page` gains a return
+column that the build log reads.
+
+What it contains:
+
+- `award_milestones(user, vehicle)`, security invoker, plus six triggers that call it: on
+  `expenses`, `fuel_logs`, `service_records`, `mod_plans`, `timeline_notes` and `vehicles`.
+- `create or replace view v_timeline` with one column added at the end, `stamp`.
+- `drop function timeline_page(...)` and a recreate. The signature is identical; only the
+  return type grows, which is why it cannot be a `create or replace`.
+
+**Ordering during the deploy is safe in both directions.** An older build ignores the extra
+column; a newer build reading an older function sees `undefined` and renders no stamps. There
+is no window where anything is broken.
+
+`lib/supabase/types.ts` was regenerated (`npm run db:types`) and is committed with it.
+
+### The milestones, and what each one means
+
+`docs/01-PRODUCT.md` names seven. The kinds written to `milestones.kind` are:
+
+| Kind | When | Dated by |
+|---|---|---|
+| `first_expense` | first non-draft expense against this car | the expense |
+| `first_mod` | first mod moved to `installed` | `installed_on` |
+| `km_10000`, `km_20000`, … | every 10,000 km of `odometer_km - purchase_odometer_km` | `odometer_at` |
+| `owned_1_year` | `purchase_date` a year ago | the anniversary |
+| `fills_10` | the tenth fill-up | the tenth fill |
+| `service_cycle` | every live schedule item done at least once | the last of those firsts |
+| `log_100` | the hundredth entry in `v_timeline`, milestones excluded | the hundredth entry |
+
+`lib/queries/milestones.db.test.ts` is eleven assertions covering all seven, and every one of
+them checks a **count** as well as a presence — a stamp that appears twice, or on the ninth
+fill-up, is exactly the failure that makes the device stop meaning anything.
+
+### Assumptions
+
+1. **Every automatic milestone is scoped to a vehicle.** The table allows a garage-wide row
+   (`vehicle_id` null) and the manual flow can still write one, but nothing automatic does.
+   The build log is per vehicle and `v_timeline` filters by it, so a milestone with no vehicle
+   would be awarded into a feed that does not exist. "First expense" therefore means the first
+   expense recorded against *that car*.
+2. **A milestone that depends on the calendar is picked up by the next write of any kind.**
+   Nothing in the schema changes when a year of ownership passes, so `owned_1_year` lands the
+   next time anything is logged for that car. The alternative is a nightly job to notice one
+   stamp a year, which is a moving part that does not earn its keep.
+3. **"First full service cycle" is read as coverage, not as a second lap** — every live
+   schedule item ticked once. A new car arrives with seven seeded intervals, so this is a real
+   milestone rather than a pair of oil changes.
+4. **Every 10,000 km is counted from the purchase odometer**, not from the clock. A car
+   entered at 34,500 gets its first stamp at 44,500. Skipped stamps are awarded on the next
+   write, so a car entered late does not lose them — capped at a hundred, so a typo of a
+   million kilometres does not write a hundred thousand rows.
+5. **`award_milestones` has no exception handler.** A milestone that cannot be computed fails
+   the write that provoked it. That is deliberate: a silent handler would make the feature
+   untestable from the outside, and the db tests are what make it checkable instead.
+6. **The drum gap replaces the thousands separator rather than sitting beside it.** A
+   separator is recognised by the shape of the formatted string — followed by exactly three
+   digits and then a non-digit — so a two-decimal currency keeps its decimal point. Nine
+   hermetic cases in `components/ui/odometer.test.ts`.
+7. **The roll is switched on deliberately, five figures at a time.** `<Money roll>` is off by
+   default. The five that have it are the ones `docs/03-DESIGN.md` names: monthly total, cost
+   per km, total invested, fund progress, build-sheet total. A ledger of sixty rolling rows is
+   the failure mode the document is guarding against when it says everything else stays quiet.
+8. **The stamp is drawn in raw brick on raw cream in both colour modes.** Everything else
+   semantic lifts in the dark; a stamp does not, because it is ink on its own piece of paper
+   and brings its own contrast with it. Measured at 4.71:1 either way.
+9. **A stamp leans between -1.5 and -4.5 degrees**, six values averaging the -3 the document
+   specifies. Exactly -3 down a feed reads as a component; -3 then +4 reads as a bug.
+10. **Dark mode follows the system and has no setting.** `profiles` has no column for a theme
+    preference and CLAUDE.md rule 4 forbids inventing one. `@media (prefers-color-scheme: dark)`
+    is the whole implementation.
+11. **The empty state's button reaches the FAB slot through a window event.** `@fab` is a
+    parallel route and therefore a sibling of the page, so the sheet's open state is not
+    reachable from a component on the page. The alternative was a context provider around the
+    whole shell, which every route would then be able to write to.
+12. **The build log's empty state offers "Log expense" rather than "Add note"**, even though a
+    note is the more build-log thing to write: an expense against the car fills every other
+    number on that screen too, and Add note is a labelled pill directly above the FAB anyway.
+13. **The generic undo restores by inserting into a named table.** It looks alarming and is
+    not: every one of those tables is RLS-protected on `user_id`, the signed-in user's own
+    token can already `POST /rest/v1/fuel_logs` with any body through PostgREST, and `user_id`
+    is overwritten from the session rather than taken from the payload. The reachable state is
+    identical to what a curl command with the user's own key already reaches. It cannot
+    update, cannot delete, and cannot touch a table off the list.
+14. **A failed write always offers Retry, including a validation failure that will fail again.**
+    Distinguishing the two would mean typing the error, and a retry of a deterministic failure
+    costs a tap and tells the truth about what happened.
+15. **`--positive` and `--text-faint` part company with the ramp on paper.** The source palette
+    is exactly what `docs/03-DESIGN.md` draws and is untouched; the two *semantic* tokens that
+    have to carry small text are the same hue and saturation taken down until they clear the
+    document's own 4.5:1 floor. The document was not edited. See "where confidence is low".
+16. **The dark accent is #CC795A rather than the #C4633F the document names.** That value is
+    3.73:1 as text on `--surface`, and the accent is text as often as it is a fill — every
+    "Start a fund" in the app is `text-accent`. Same hue and saturation, carried up until it
+    clears the floor.
+17. **Two structural sizes were added to the Tailwind spacing scale**, `thumb` (80px) and
+    `amount` (128px), alongside the `touch`/`nav`/`fab` that Phase 0 added for the same reason.
+    They are objects with a size rather than gaps between things. This was forced: `w-20` and
+    `w-32` do not exist in this theme and four call sites were rendering at zero width.
+18. **`robots.txt` is permissive rather than `Disallow: /`.** Everything of substance is behind
+    the proxy, so a crawler following a link finds the sign-in page; a blanket disallow would
+    tell every checker the site is deliberately hidden and score it accordingly.
+
+### Four utility classes that did not exist
+
+`npm run check:contrast` was written to check colours and ended up being the thing that made
+me look at the built CSS, where four classes used in the source were simply absent — the
+spacing scale is *replaced* in `tailwind.config.ts`, not extended, so anything off it silently
+produces nothing:
+
+| Class | Where | What it was doing |
+|---|---|---|
+| `h-1.5` | fund progress, budget caps, category breakdown | three progress bars at zero height |
+| `w-20` | the vehicle card thumbnail | a 16:9 frame at zero width |
+| `w-32` | the per-category cap input | an amount field with no width |
+| `mt-0.5` | a recurring row's second line | no margin |
+
+All four are fixed. None of them is this phase's work; they are pre-existing and none of
+typecheck, lint or build could have caught them.
+
+### The Lighthouse run
+
+`npm run build && npm run lighthouse`, against the local production server with the local
+Supabase stack, Lighthouse 13.4 mobile preset (Moto G Power emulation, 4x CPU throttle,
+simulated 4G), each route warmed once first. Two consecutive runs, worst figure of the two:
+
+| Route | Perf | A11y | Best practices | SEO | FCP | LCP | TBT | CLS |
+|---|---|---|---|---|---|---|---|---|
+| `/today` | 91 | **100** | 100 | 100 | 1.85s | 3.20s | 93ms | 0.001 |
+| `/ledger` | 94 | **100** | 100 | 100 | 1.98s | 2.73s | 102ms | 0.001 |
+| `/garage/[id]` | 88 | **100** | 100 | 100 | 1.98s | 3.52s | 121ms | 0.001 |
+| `/money` | 90 | **100** | 100 | 100 | 1.98s | 3.23s | 124ms | 0.000 |
+| `/money/reports` | 92 | **100** | 100 | 100 | 1.96s | 2.89s | 129ms | 0.000 |
+| `/settings` | 93 | **100** | 100 | 100 | 1.97s | 2.89s | 122ms | 0.000 |
+
+**Accessibility is 100 on every route**, against the roadmap's "95+". Best practices and SEO
+are 100. Performance is 88-94, and run-to-run variance on this machine is about six points —
+`/garage/[id]` scored 78 on one run and 89 on the next with no change in between.
+
+The three largest route bundles, from `npm run measure:bundles`:
+
+```
+/garage/[vehicleId]        33.0KB own JS
+/garage/[vehicleId]/plan   28.4KB own JS
+/ledger                    21.5KB own JS   (/today is 21.2KB)
+```
+
+**Every route is comfortably inside the 40KB of route-specific JavaScript** CLAUDE.md §3
+budgets. The shared baseline measured **140.7KB gzipped across nine chunks**, against the
+139.4KB recorded in CLAUDE.md on 25 August 2026 and the 139.7KB Phase 8 measured. That is
+1.3KB of drift across two phases with no framework upgrade — noise, and far below the ~10KB
+that would mean something had landed in the shell. CLAUDE.md has not been edited for it,
+following the precedent Phase 8 set; recording it there is the owner's call.
+
+### Where the two paint budgets are not met, and why
+
+CLAUDE.md §3 asks for FCP under 1.2s and LCP under 1.8s. Measured here: **FCP 1.85-1.98s,
+LCP 2.73-3.52s.** Both miss. This is the one acceptance criterion this phase does not clear
+and it is worth reading the working rather than the verdict.
+
+**What was fixed, and what it bought.** Three things moved these numbers materially:
+
+| Change | LCP on `/today` |
+|---|---|
+| Starting point | 4.08s |
+| Fonts no longer preloaded | 2.72s |
+| Per-request auth call memoised | 2.58s |
+
+The fonts were the big one. `next/font/google` preloads every subset it generates, which for
+two variable families across `latin`, `latin-ext` and `vietnamese` is six files and 357KB, all
+at the highest priority on a link the rest of the page is also trying to use. Dropping the
+preload lets `unicode-range` do its job — an English screen fetches the latin subset and
+nothing else, three files and 162KB, and a Vietnamese screen fetches the Vietnamese subset
+when there is Vietnamese on it. `adjustFontFallback` stays on, and measured CLS is 0.001.
+
+**What is left, in order of size.**
+
+1. **Time to first byte, which is most of it.** Lighthouse's LCP breakdown on `/today` put
+   566ms of an unthrottled 940ms into TTFB. Three sequential auth round trips used to happen
+   before a byte of HTML left the server — one in the proxy, one in the authenticated layout,
+   one in `fetchUserId()`. React's `cache()` merged the last two; the proxy's cannot be merged,
+   because it runs in a different context. What is left is one `getUser()` in the proxy and one
+   in the layout, and `getUser()` is a network call by design — verifying the token against the
+   auth server is the reason to prefer it to reading the cookie. **Removing the layout's check
+   would be the single largest remaining win and it is not a change an unattended run should
+   make**: `app/(app)/layout.tsx` says in a comment that it is what actually protects the data
+   and that the proxy is the thing with a matcher that could be typo'd. `supabase.auth.getClaims()`
+   verifies locally against the project's public key and would close most of the gap, but only
+   on an asymmetric-JWT project — worth checking whether yours is one.
+2. **The local stack is not the deployed one.** `next start` on a laptop talking to Supabase in
+   Docker measured 340-560ms of server response, varying by 200ms between runs on identical
+   code. Vercel with Supabase in the same region will not look like that. These numbers are
+   honest about this machine and should be re-measured against the deployment before anybody
+   concludes the app is slow.
+3. **162KB of webfont is still 162KB.** Two variable families with a weight axis are about
+   90KB and 45KB for their latin subsets. Subsetting them the way `scripts/subset-mono.mjs`
+   already subsets JetBrains Mono would cut that hard, and is the obvious next move if the
+   deployed figures still miss.
+4. **The 140.7KB framework baseline** arrives on every route and no application change moves
+   it. It is why `unused-javascript` fails on every route in the report and always will.
+
+**The one trade-off worth knowing about.** Preloading the fonts gives FCP 0.91-0.93s — inside
+the budget — and LCP 3.76-5.05s. Not preloading gives FCP ~1.9s and LCP ~2.9s. Neither
+configuration meets both figures; the one shipped is the one with the better composite score
+and the better LCP, on the reasoning that LCP is what "the screen is ready" means to a person
+and that a repeat visit has the fonts cached either way. If you would rather have the FCP,
+it is one line in `app/fonts.ts`.
+
+### Not built, and why
+
+- **Confirming a recurring draft has no Undo.** Dismissing one does. Confirming is the
+  affirmative action the tray exists for, nothing is lost by it — the expense is in the ledger
+  and can be edited or deleted like any other — and an Undo that turned a real expense back
+  into a draft is a fourth state for something that already has three.
+- **A theme setting.** Per assumption 10: `profiles` has no column for one, and CLAUDE.md rule
+  4 forbids inventing schema. Adding `profiles.theme` plus a migration plus a `docs/02-DATA-MODEL.md`
+  edit is a decision, not a coding detail.
+- **The `llms-txt` and `bf-cache` audits still fail.** The first wants an `/llms.txt`, which a
+  private expense tracker has no business publishing. The second is Next's `Cache-Control:
+  no-store` on dynamic pages, which is correct for pages that render one person's money.
+- **Category and vehicle colours are not contrast-checked in dark mode.** They are user data —
+  a hex per row, chosen from a seven-swatch palette — and the "Ink" swatch is #2A2620, which is
+  nearly invisible against a dark surface. Every one of them is a decorative tint on an
+  `aria-hidden` icon or a bar with the same information in words beside it, so nothing is
+  carried by colour alone, but a person who picked Ink for a category will not see it at night.
+- **Torn edges on the ledger row.** Owed since Phase 5 and still declined for the same reason:
+  `docs/03-DESIGN.md`'s "ledger detail line" section fixes the row at 64px with structured
+  fields only, and the virtual list depends on that height. The torn treatment is in the feed
+  and in the edit sheet, which is where there is room for it.
+- **A sweep for orphaned storage objects.** Owed since Phase 3, and this phase makes the debt
+  deliberate rather than accidental: the undo snapshots restore attachment *rows*, and they can
+  only do that because the objects were never deleted.
+
+### Where confidence is low
+
+- **Nothing here has been looked at.** Not on a phone, not on a desktop, not in dark mode. The
+  odometer's cell geometry, the stamp's noise opacity, the drum-gap seams and the entire dark
+  palette have been built to the document, measured where they are measurable, and rendered
+  into HTML that was grepped for the right classes — but no human eye has been on any of it.
+  The odometer's baseline in particular is the fiddly part: a clipped inline-block takes its
+  baseline from its bottom margin edge, so the clipping happens on an absolutely-positioned
+  window inside the cell and the cell's baseline comes from a hidden copy of the character.
+  It is correct in principle; **look at "12.500.000 ₫/km" and check the "/km" sits on the same
+  line as the digits.**
+- **The three-step ink ramp is now two and a half.** `--text-muted` is #6B6357 and
+  `--text-faint` had to come down to #72685D to clear 4.5:1 on the odometer bed at 12px. They
+  are nearly the same colour. This is not a value that can be tuned — on a #F2EBD9 panel,
+  nothing lighter clears the floor for small text — so the real choice is between a visible
+  tertiary step and a compliant one, and I took compliant because the phase's acceptance
+  criterion is an accessibility score. If you would rather have the hierarchy back, the honest
+  move is to darken `--text-muted` as well so there is a gap again, and that is a design
+  decision rather than a fix.
+- **The undo snapshot's insert has been proved against the schema, not against the action.**
+  `lib/queries/undo.db.test.ts` photographs, deletes and re-inserts a fuel log, a part, a
+  service record, a recurring template, a fund with its cascaded contributions and an expense
+  with its attachment rows, and asserts the row comes back byte-identical including `id` and
+  `created_at`. What is *not* covered by a test is `restoreSnapshot` itself — it is a server
+  action and needs a session, a running Next server and a click. **Tap Undo on one of each
+  before trusting it.**
+- **The quick-add draft restores silently.** Open the sheet, type an amount, close it without
+  saving, open it again and the amount is there. That is the behaviour the "no data loss"
+  requirement asks for and it will surprise somebody at least once. It expires after 24 hours
+  and only restores when an amount was actually typed.
+- **The `pg_cron` schedule from Phase 8 is still unobserved**, and this phase did not touch it.
+- **Milestone detection adds seven queries to every write of an expense, a fill-up, a service
+  record, a mod, a note or a vehicle.** On one person's data that is nothing; it has not been
+  measured against ten thousand rows. If it ever matters, the fix is to make each trigger call
+  only the milestone its table can affect, which is a bigger function and a smaller bill.
+
+### What a reviewer should check first
+
+1. **Push `0019_milestones_and_stamps.sql` before deploying.** Take the backup first, as
+   always. The app and the migration have to land together, and `timeline_page` is dropped and
+   recreated rather than replaced.
+2. **Open a vehicle with some history in it and look at the stamps.** They should lean by
+   different amounts down the feed, sit the same way after a reload, and read as ink rather
+   than as badges. This is the element with the most judgement in it and the least verification.
+3. **Watch a hero figure change.** Switch Monthly to All-in on `/today` and watch the digits
+   roll from the right. Then turn on Reduce Motion in the system settings and do it again: it
+   should cross-fade, not snap and not jump.
+4. **Turn the phone dark.** Everything should invert except the photo viewer and the stamps,
+   both of which are deliberate. `npm run check:contrast` proves the tokens; only your eye can
+   say whether the dark garage looks like one.
+5. **Tap Undo on each of the six deletes.** A fill-up, a part, a service record, a fund, a
+   recurring template, a dismissed draft — and a part taken off the car, which is the ambiguous
+   one and takes back the negative sale expense as well.
+6. **Turn off the network mid-save.** Type an expense, put the phone in flight mode, tap Save.
+   The toast should offer Retry; turning the network back on and tapping it should land the
+   expense with nothing retyped. Then do it again and reload the page instead of retrying —
+   the sheet should open on what you typed.
+7. **Re-run `npm run lighthouse` against the deployment**, not this machine, before deciding
+   anything about the two paint budgets. The working is above; TTFB is most of the gap and
+   this laptop is not Vercel.
