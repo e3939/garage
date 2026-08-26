@@ -14,13 +14,16 @@ import { VehicleMonthTotal } from '@/components/vehicles/vehicle-month-total'
 import { monthStart, todayIso } from '@/lib/dates'
 import { monthLabel } from '@/lib/dates-display'
 import type { RawSearchParams } from '@/lib/expenses/filters'
+import { fetchFuelSummary } from '@/lib/queries/fuel'
 import { fetchProfilePreferences, fetchUserId } from '@/lib/queries/profile'
+import { fetchMostUrgentService } from '@/lib/queries/service'
 import { fetchTimelinePage } from '@/lib/queries/timeline'
 import { fetchBuildSheetTotal, fetchInspirationPhotos } from '@/lib/queries/mods'
 import { fetchVehicle, fetchVehicleMonthTotals, fetchVehicleTotals } from '@/lib/queries/vehicles'
 import { signedUrl } from '@/lib/storage/signed-url'
 import { formatMoney } from '@/lib/money'
 import { planningAccuracyReading } from '@/lib/mods/types'
+import { dueSummary } from '@/lib/service/types'
 import { parseSpendView, SPEND_VIEW_PARAM } from '@/lib/views'
 
 export const metadata: Metadata = { title: 'Vehicle' }
@@ -44,8 +47,8 @@ function firstParam(value: string | string[] | undefined): string | null {
  * amount on the purchase date" — amortising a lifetime total would be
  * meaningless, and a figure that silently ignored the control above it would be
  * worse than one that names the view it is showing. The third figure is the
- * month, and it responds to all three views. The fourth is the service schedule,
- * which is Phase 6.
+ * month, and it responds to all three views. The fourth is the next service due,
+ * which is a gauge rather than a number and a banner least of all.
  *
  * Every figure is computed by `v_vehicle_totals` or `v_vehicle_month_totals`.
  * Nothing on this page is reduced in the browser.
@@ -64,7 +67,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   const view = parseSpendView(firstParam(raw[SPEND_VIEW_PARAM]), preferences.defaultView)
   const month = monthStart(todayIso())
 
-  const [totals, monthTotals, heroUrl, timeline, userId, planTotals, inspiration] =
+  const [totals, monthTotals, heroUrl, timeline, userId, planTotals, inspiration, nextService, fuel] =
     await Promise.all([
       fetchVehicleTotals(vehicle.id, preferences.baseCurrency),
       fetchVehicleMonthTotals(vehicle.id, month, preferences.baseCurrency),
@@ -73,6 +76,8 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       fetchUserId(),
       fetchBuildSheetTotal(vehicle.id, preferences.baseCurrency),
       fetchInspirationPhotos(vehicle.id),
+      fetchMostUrgentService(vehicle.id),
+      fetchFuelSummary(vehicle.id, preferences.baseCurrency),
     ])
 
   const search = new URLSearchParams()
@@ -160,7 +165,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         />
       ) : null}
 
-      <ServicePanel />
+      <ServicePanel vehicleId={vehicle.id} due={nextService} locale={preferences.locale} />
 
       <nav aria-label="This vehicle">
         <ul className="overflow-hidden rounded-md border border-border bg-surface">
@@ -188,6 +193,43 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
           </li>
           <li className="border-t border-border">
             <Link
+              href={`/garage/${vehicle.id}/service` as Route}
+              className="flex min-h-touch items-center justify-between gap-4 px-4 py-3"
+            >
+              <span className="text-body text-ink">Service</span>
+              <span className="text-caption text-ink-muted">
+                {nextService === null
+                  ? 'Nothing scheduled'
+                  : `${nextService.name} · ${dueSummary(nextService, preferences.locale).toLowerCase()}`}
+              </span>
+            </Link>
+          </li>
+          <li className="border-t border-border">
+            <Link
+              href={`/garage/${vehicle.id}/fuel` as Route}
+              className="flex min-h-touch items-center justify-between gap-4 px-4 py-3"
+            >
+              <span className="text-body text-ink">Fuel</span>
+              <span className="text-caption text-ink-muted">
+                {fuel.fills === 0
+                  ? 'No fill-ups yet'
+                  : fuel.l_per_100km === null
+                    ? `${fuel.fills} ${fuel.fills === 1 ? 'fill-up' : 'fill-ups'}`
+                    : `${fuel.fills} ${fuel.fills === 1 ? 'fill-up' : 'fill-ups'} · ${fuel.l_per_100km} L/100km`}
+              </span>
+            </Link>
+          </li>
+          <li className="border-t border-border">
+            <Link
+              href={`/garage/${vehicle.id}/parts` as Route}
+              className="flex min-h-touch items-center justify-between gap-4 px-4 py-3"
+            >
+              <span className="text-body text-ink">Parts</span>
+              <span className="text-caption text-ink-muted">On the car and on the shelf</span>
+            </Link>
+          </li>
+          <li className="border-t border-border">
+            <Link
               href={`/garage/${vehicle.id}/edit` as Route}
               className="flex min-h-touch items-center justify-between gap-4 px-4 py-3"
             >
@@ -210,10 +252,6 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
           lastReading={vehicle.odometer_km}
         />
       </section>
-
-      <p className="text-caption text-ink-muted">
-        Service, fuel and parts arrive in Phase 6.
-      </p>
     </div>
   )
 }

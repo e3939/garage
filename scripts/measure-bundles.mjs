@@ -167,6 +167,9 @@ async function main() {
     0,
     `/garage/${vehicleId}`,
     `/garage/${vehicleId}/plan`,
+    `/garage/${vehicleId}/service`,
+    `/garage/${vehicleId}/fuel`,
+    `/garage/${vehicleId}/parts`,
   )
 
   const server = spawn('npx', ['next', 'start', '-p', String(PORT)], {
@@ -210,14 +213,23 @@ async function main() {
       const own = sources
         .filter((src) => !shared.includes(src))
         .reduce((total, src) => total + gzippedBytes(src), 0)
-      const label = route.endsWith('/plan')
-        ? '/garage/[vehicleId]/plan'
+      const room = route.match(/^\/garage\/[^/]+\/(\w+)$/)?.[1]
+      const label = room
+        ? `/garage/[vehicleId]/${room}`
         : route.startsWith('/garage/') && route !== '/garage/new'
           ? '/garage/[vehicleId]'
           : route
       console.log(
-        `${label.padEnd(24)}${kb(own).padStart(7)}${kb(own + baseline).padStart(11)}`,
+        `${label.padEnd(26)}${kb(own).padStart(7)}${kb(own + baseline).padStart(11)}`,
       )
+
+      // `MEASURE_DETAIL=1` names the chunks a route pays for on its own, which
+      // is the only way to find out why a figure moved.
+      if (process.env.MEASURE_DETAIL === '1') {
+        for (const src of sources.filter((entry) => !shared.includes(entry))) {
+          console.log(`  ${kb(gzippedBytes(src)).padStart(8)}  ${src}`)
+        }
+      }
     }
   } finally {
     server.kill('SIGTERM')

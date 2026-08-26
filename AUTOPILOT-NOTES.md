@@ -1716,3 +1716,427 @@ needs recording, and it is the first thing to look at:
    across installed mods only, and mods with no estimate are in neither sum.
 7. **The before/after slider with a real photograph of your car**, which is the one part of this
    phase whose whole point is how it looks.
+
+---
+
+## Phase 7 — Maintenance, fuel and parts
+
+Branch: `feat/07-car-records` (the roadmap names this branch `feat/car-records` and calls it
+Phase 6; as in every phase before it the branch already existed under the other name when the
+run started and was left alone. The heading here follows the branch number so the sections in
+this file stay in order — it is roadmap Phase 6, "Maintenance, fuel, parts").
+
+### What was built
+
+- **A service book that fills itself in.** A new vehicle arrives with the seven default
+  intervals from `docs/01-PRODUCT.md` section D, written by a trigger on `vehicles`, and
+  every one of them is editable and removable. `v_service_due` turns each row into a due
+  point on both axes, how far off it is on each, and a state of ok / due soon / overdue —
+  whichever axis comes first wins. A schedule nobody has marked done yet is measured from the
+  day the car was taken on, and says so rather than pretending it was serviced that day.
+- **The gauge, not the banner.** The vehicle home's fourth figure is a 240-degree arc with the
+  item's name and one line saying how far off it is. It is the same panel in the same place
+  whether the answer is four thousand kilometres or minus two hundred; only the colour of the
+  arc moves. It is an SVG drawn on the server, so it costs no JavaScript.
+- **Mark done, once.** One sheet writes the service record and — behind a switch that is on by
+  default — the expense that paid for it, in a single call that takes the expense back out if
+  the record is refused. The schedule's `last_done_*` is not written by the form: a trigger
+  recomputes it from the records, so back-dating a forgotten oil change does not move the
+  schedule backwards and deleting the last record puts it back to never-done.
+- **Fuel that shows its working.** The form derives price-per-litre live as you type, which is
+  what makes a misplaced decimal announce itself before Save. `v_fuel_consumption` produces
+  one row per full-tank-to-full-tank interval — partials accumulate into the next one, an
+  interval containing a missed fill is skipped whole — and the screen shows L/100km and km/L
+  together, a three-interval rolling average, cost per kilometre, and a sparkline with a
+  dashed marker on every date a mod went on the car.
+- **Parts, and the sale that nets out.** The inventory is grouped by status, a part can be
+  made from scratch or from an expense already in the ledger, and taking one off the car asks
+  keep / sell / bin. Selling writes one expense with a minus in front of it, in the same
+  bucket and against the same mod as the purchase — so a mod that cost twelve million and
+  sold its old airbox for three reads nine million everywhere in the app, with no code
+  anywhere knowing that a sale is a special kind of thing.
+
+### Proof it works
+
+`npm test` — **236 hermetic tests**, 18 of them new in `lib/fuel/consumption.test.ts`, which
+is the file CLAUDE.md section 7 asks for. `npm run test:db` — **144 against a database reset
+from zero**, 24 of them new in `lib/queries/car-records.db.test.ts`. `npm run typecheck`,
+`npm run lint` (0 errors, 7 react-hook-form compiler warnings — the 4 pre-existing ones plus
+one each for the three new forms, which use `watch()` the same way every other form does) and
+`npm run build` all clean. `npx supabase db reset` replays all sixteen migrations from
+nothing.
+
+Beyond the suites, the production build was driven over HTTP with a real magic-link session
+and the Server Actions called by their action ids. **60 checks, all passing:**
+
+| Check | Result |
+|---|---|
+| `/garage/[id]/service`, `/fuel`, `/parts` signed in | 200, and no emoji in any of them |
+| The seven seeded intervals on a fresh car | all present |
+| The oil change on a car bought at 30,000km now reading 34,800 | `Due in 200 km`, "estimated from purchase" |
+| The due gauge | an `<svg>`, and nothing that reads as a warning banner |
+| Vehicle home | names the item, says how far off, links to all three rooms |
+| `markServiceDoneAction` with an expense | record written, `expense_id` set, expense in the ledger as running spend that counts |
+| The roll-up trigger | schedule moved from 35,000 to 39,800 and out of "due soon" |
+| Three fill-ups, one of them partial | one interval: 500km, 45L, **9.00 L/100km, 11.11 km/L, 2,070 ₫/km** |
+| The screen | shows `9 L/100km` and `11.11 km/L`; the partial fill's row says `part fill` |
+| A fourth fill | sparkline drawn, `Marked: Intake` on it, rolling average 7.75 |
+| `createPartAction` with a new expense | part and expense written, mod costs 12,000,000 |
+| `removePartAction` selling for 3,000,000 | **mod costs 9,000,000**, one negative expense, same bucket, same mod |
+| The inventory | groups it under `Sold · 1` and shows the net |
+| Keep, then bin | status moves, no expense written either time |
+| Selling for nothing | refused with **"What did it sell for?"** |
+| A schedule with no interval at all | refused with "Give it a distance, a time, or both" |
+| Remove a schedule item, then undo | off the schedule, then back |
+| A second user opening any of the three rooms | 404 |
+
+### The acceptance criterion, with the working shown
+
+*"Consumption between two full tanks matches a hand calculation exactly."*
+
+Four fill-ups. The middle one is a splash, not a fill:
+
+```
+ 1 Feb   10,000 km   40.0 L   920,000 d   full      <- opens interval 1
+ 8 Feb   10,240 km   20.0 L   460,000 d   partial
+15 Feb   10,500 km   25.0 L   575,000 d   full      <- closes 1, opens 2
+28 Feb   11,000 km   32.5 L   747,500 d   full      <- closes 2
+```
+
+**Interval 1.** Distance is `10,500 − 10,000 = 500 km`. The litres are the ones put in *after*
+the tank was last full: `20 + 25 = 45 L`. The opening 40 litres are not in it — that fuel is
+what the car ran on to reach 10,240, and it was measured by the fill that replaced it.
+
+```
+45 × 100 ÷ 500  = 9.00 L/100km
+500 ÷ 45        = 11.11 km/L
+460,000 + 575,000 = 1,035,000 d
+1,035,000 ÷ 500 = 2,070 d/km
+1,035,000 ÷ 45  = 23,000 d/L
+```
+
+**Interval 2.** `11,000 − 10,500 = 500 km` on 32.5 L.
+
+```
+32.5 × 100 ÷ 500 = 6.50 L/100km
+500 ÷ 32.5       = 15.38 km/L
+```
+
+**Rolling three.** `9.00`, then `(9.00 + 6.50) ÷ 2 = 7.75`.
+
+**Lifetime.** Litres-weighted, not a mean of the two ratios: `77.5 L ÷ 1,000 km × 100 = 7.75`.
+
+Every one of those figures is asserted three times, in three places, deliberately: by hand in
+`lib/fuel/consumption.test.ts`, against `v_fuel_consumption` in
+`lib/queries/car-records.db.test.ts`, and on the rendered page in the HTTP probe. The database
+test also asserts the view and the TypeScript module agree figure for figure, which is the
+same arrangement `lib/budget.ts` has with `v_expense_impact`: one implementation is the source
+of truth and the other is what proves it has not drifted.
+
+A fifth fill-up flagged `missed_previous` was added in the suites: the interval it sits in is
+skipped whole rather than averaged over, because litres were burned that nobody logged and a
+figure computed from them would be confidently wrong.
+
+### Route size
+
+`npm run build && npm run measure:bundles`. The script now also weighs the three new rooms,
+and `MEASURE_DETAIL=1` names the chunks a route pays for on its own, which is what made the
+regression below findable at all.
+
+| Route | Own JS before | Own JS after |
+|---|---|---|
+| `/today` | 32.9KB | **19.0KB** |
+| `/ledger` | 33.4KB | **20.4KB** |
+| `/garage` | 38.2KB | **13.1KB** |
+| `/garage/[vehicleId]` | 45.7KB | **31.4KB** |
+| `/garage/[vehicleId]/plan` | 26.2KB | 26.3KB |
+| `/garage/[vehicleId]/service` | — | **5.4KB** |
+| `/garage/[vehicleId]/fuel` | — | **4.3KB** |
+| `/garage/[vehicleId]/parts` | — | **5.3KB** |
+| `/garage/new` | 16.1KB | 16.1KB |
+| `/money` | 28.6KB | **2.9KB** |
+| `/settings` | 0.0KB | 0.0KB |
+| `/settings/categories` | 12.1KB | 11.9KB |
+
+Shared baseline 139.7KB across eight chunks, unchanged — nothing landed in the shell.
+
+**Every route is now inside the 40KB ceiling, including `/garage/[vehicleId]`, which has been
+over it since Phase 5 and which that phase recorded as unfixable.** That did not come free and
+the story is worth reading before the diff is reviewed.
+
+#### The chunk duplication, and the one Phase 2 file this branch touches
+
+Adding the three rooms pushed `/today` from 32.9KB to 42.3KB and `/ledger` from 33.4 to 42.7 —
+two routes that gained no code at all in this phase. `MEASURE_DETAIL=1` showed why: the
+expense form was being emitted into **two** initial chunks and those routes were downloading
+the same 8.4KB gzipped twice. `/today` and `/ledger` are the only two screens that render the
+ledger list *and* the quick-add FAB, which are two separate client entry graphs, and with the
+form statically imported into both, Turbopack stopped sharing it once the module graph got
+wide enough. It is a threshold, not a particular import: either new room alone measured 33.9KB
+on `/today`; any two of them together measured 42.3.
+
+Three fixes were tried and measured before the fourth worked, and all three are recorded here
+so nobody repeats them:
+
+1. **Stop `LinkedExpenseField` importing `CategoryChips`** so the two graphs share less.
+   42.3 → 41.7. Not the cause, and it duplicated the chip-rendering by hand. Reverted.
+2. **Drop `<VirtualList>` from the fuel log** for `content-visibility: auto`. 42.3 → 42.2. Not
+   the cause either — but this one was **kept**, because it is the right answer on its own
+   merits: it is the same choice the build log made for the same reason, and a fixed-height
+   row list of at most 120 entries does not need measured windowing.
+3. **Load the three new rooms' sheets through `next/dynamic`.** 42.3 → 41.3. Not enough on its
+   own, and also **kept**: a screen's own sheet is by definition not needed to read the screen,
+   which is the reasoning the mod board already used for the same component.
+4. **Give the expense form one shared lazy chunk.** `components/expenses/expense-form-lazy.tsx`
+   is now the only handle on it, and `quick-add.tsx`, `ledger-list.tsx` and `mod-board.tsx` all
+   use it. One chunk exists, so no initial chunk can contain it, and the duplication is gone
+   rather than merely deferred.
+
+**The cost of (4), stated plainly: the expense form is fetched on the tap that opens it rather
+than with the page.** That is a change to the app's most-used interaction, made in a phase that
+did not ask for it, and a reviewer may reasonably want it back. Two things were done about it:
+
+- `preloadExpenseForm()` fires on `pointerdown` — on the FAB and on every ledger row — so the
+  fetch is already in flight while the finger is still on the glass, and the sheet's own
+  chrome, which is static, is what opens. `components/ui/fab.tsx` and
+  `components/ledger/ledger-row.tsx` each grew one optional `onPointerDown` prop for this.
+- If you would rather pay the bytes up front, the revert is small and self-contained: import
+  `ExpenseForm` directly in `quick-add.tsx` and `ledger-list.tsx` again and delete
+  `expense-form-lazy.tsx`. `/today` and `/ledger` go back to roughly 42KB and over budget, and
+  `/garage/[vehicleId]` back to 45.7. **This is the one judgement call in the phase that is
+  genuinely yours to make**, and it has not been tested on a real device — see "where
+  confidence is low".
+
+### Assumptions
+
+1. **An unserviced schedule is measured from the purchase.** The seeded set arrives with no
+   `last_done_*`, and an interval has to run from *something* or the whole feature is inert
+   until the first time you mark an item done. The baseline is `purchase_odometer_km` and
+   `purchase_date` — the same pair `km_driven` is measured from — and `v_service_due` carries a
+   `basis` column so every screen can say "estimated from purchase" rather than claim the car
+   was serviced that day. With no purchase date the row's own `created_at` stands in.
+2. **All seven defaults are seeded on every vehicle, whatever it runs on.** An electric car has
+   no spark plugs and its owner deletes the row in one tap. A table that decided for them would
+   be a table with an opinion about hybrids, range extenders and rotaries, and it would be
+   wrong about at least one of them.
+3. **"Deletable" is an archive.** A schedule that has been marked done has service records
+   pointing at it; a hard delete would be refused by the foreign key or would take the
+   record's link with it. `archived_at` takes the row off the schedule, out of `v_service_due`
+   and out of the gauge — every visible consequence of a delete — and the undo is one tap.
+4. **`last_done_km` and `last_done_on` are two independent maxima**, not one row's pair of
+   columns. They come apart when a record carries no odometer, which is allowed and common on
+   a workshop invoice, and taking the latest row's null would throw away a reading that is
+   still the best thing known about the kilometre axis.
+5. **The roll-up trigger recomputes rather than writes forward.** `docs/02-DATA-MODEL.md` only
+   asks for "inserting a record updates the parent schedule's `last_done_*`", but a trigger
+   that only handles insertion is wrong the first time somebody fixes a date or deletes a
+   record. This one fires on insert, update and delete and recomputes from the records.
+6. **"Due soon" is absolute and `remaining_fraction` is relative, so the view carries both.**
+   The thresholds are 500km and 30 days whatever the interval, which means a 40,000km coolant
+   flush becomes "due soon" at 1.25% of its interval while a 5,000km oil change 600km out is
+   still "ok" at 12%. Ordering by fraction alone would put the wrong one first, so
+   `v_service_due` also carries an integer `urgency` (0 overdue, 1 due soon, 2 ok) and every
+   screen sorts by that first and the fraction second.
+7. **The gauge is the budget arc's gesture, minus the two things that make it a signature
+   element.** No tick marks and no sweep-in. `docs/03-DESIGN.md` says there are four signature
+   elements and not to add a fifth; this is the same shape, quieter, in a corner.
+8. **A fill-up writes an expense too, behind a switch that starts on.** The phase brief lists
+   the fuel form's fields and does not mention an expense — but `fuel_logs.expense_id` is in
+   the data model, "Fuel" is a seeded category, and a log whose fills never reach the ledger
+   would leave the largest running cost most cars have out of every cost-per-km figure in the
+   app. Editing a fill-up moves the linked expense's amount, date, station and odometer with
+   it; deleting one deletes the expense, because they are the same event. A service record's
+   expense is *not* deleted with the record, because that expense is money that really left the
+   account and the record is a logbook entry about it.
+9. **"Skip any interval where `missed_previous` is true" means the whole interval.** The flag
+   says litres were burned that nobody logged, so the litres in that window do not account for
+   the distance in it. The figure is not wrong by a little; it is unknowable.
+10. **"A 3-fill rolling average" is the last three completed intervals**, this one included,
+    and fewer than three averages what exists. A window over *fills* rather than intervals
+    would move when a partial fill is logged, which is a fill that produces no figure.
+11. **An interval that mixes currencies computes its consumption and not its cost.** Litres and
+    kilometres are physics and are unaffected; money without a stored rate is not convertible
+    (CLAUDE.md section 5), so `cost`, `cost_per_km` and `cost_per_litre` go null and
+    `l_per_100km` does not.
+12. **Lifetime consumption is litres-weighted**, `total litres ÷ total distance`, not the mean
+    of the per-interval figures. A mean of ratios gives a 40km splash-and-dash the same say as
+    a 600km motorway run, which is how a fuel log ends up disagreeing with the arithmetic
+    somebody did on the back of the receipt.
+13. **Fills are ordered chronologically** — `(filled_on, odometer_km, id)` — because that is the
+    order they happened in and the odometer is a reading, not a clock. An interval that comes
+    out at zero distance or less is a typo somewhere and is dropped rather than shown as an
+    infinity.
+14. **The consumption chart is a hand-drawn SVG, not Recharts.** This is the one place the code
+    diverges from the stack table in CLAUDE.md section 2, and the reason is in
+    `components/fuel/consumption-chart.tsx`: Recharts is the right answer for the reports in
+    Phase 7 — axes, tooltips, a legend, several series — and it is several times this route's
+    entire 40KB budget for one polyline and some dots. Drawn on the server it costs no client
+    JavaScript at all and is legible with scripting off. **CLAUDE.md was not edited.** The
+    chart's y-axis deliberately does not start at zero, and prints its floor and ceiling so the
+    scale is stated rather than implied.
+15. **A mod marker sits on the first interval that *ended* on or after the install date**,
+    because that is the first tank whose consumption the mod could have affected. A mod
+    installed after the last fill-up has nothing to sit on and is left off rather than pinned
+    to the end. The chart is hidden entirely below two intervals — one point is not a trend.
+16. **The sale amount is typed positive and negated on the server.** What the buyer handed over
+    is a positive number; the minus is the mechanism and it is not something a payload gets to
+    argue with. The sale copies the purchase's bucket, category and currency, because money
+    coming back belongs in the pile it came out of; with no purchase to copy from it lands as
+    project spend, out of the monthly view.
+17. **Picking an existing expense for a part also picks up that expense's mod.** An expense that
+    already knows which mod it paid for should not have to be told again, and the mod is what
+    the sale later nets against.
+18. **A part is deleted outright; its expenses are not.** The money was really spent and really
+    came back, and the ledger is where a wrong expense gets deleted. Putting a part back on the
+    car keeps the sale expense too — selling something and buying it back is two events.
+19. **`v_service_due` and `v_fuel_summary` compute "today" in Asia/Ho_Chi_Minh**, not the
+    server's UTC day. At half past midnight in Ho Chi Minh City those are different dates and
+    `days_remaining` would be out by one for seven hours every night. Same reasoning as
+    `mod_reorder`'s date parameter in Phase 5.
+20. **The fuel log is capped at 120 rows** — roughly ten years of monthly fills — and
+    virtualised with `content-visibility: auto` rather than the ledger's measured windowing.
+    See the route-size section for the second reason.
+21. **`numeric` arrives from PostgREST as an unquoted JSON number.** `45.000` parses to `45`,
+    so every consumption figure is converted once in `lib/queries/fuel.ts` and
+    `lib/queries/service.ts` rather than in each component, and the database tests compare
+    numbers rather than strings.
+22. **Service history and the parts list follow the ledger's detail-line rule** from
+    `docs/03-DESIGN.md`: structured fields only on the row, notes and photographs behind the
+    tap, and a glyph at the end of the line to say each exists.
+
+### Docs
+
+**Nothing under `docs/` was edited, because this phase pre-approved no edit.** Three
+divergences need recording:
+
+- **Migration `0016` adds two views and two functions that `docs/02-DATA-MODEL.md` does not
+  name** — `v_fuel_summary`, `seed_service_schedules()` and `roll_up_service_schedule()` are
+  new, and `v_service_due` and `v_fuel_consumption` are named in that document but with fewer
+  columns than they carry. The extra columns on those two are all derived rather than new
+  facts: `basis`, `basis_km`, `basis_on`, `km_fraction`, `day_fraction`, `remaining_fraction`,
+  `due_by` and `urgency` on the due view; `started_on`, `ended_on`, `start_km`, `end_km`,
+  `fills`, `currency`, `cost_per_litre`, `rolling3_l_per_100km` and `end_fuel_log_id` on the
+  consumption view. CLAUDE.md section 1 point 4 says a schema change means a migration *plus*
+  an edit to that document in the same commit, and rule 9 of this run says never edit anything
+  under `docs/` without pre-approval. The two point in opposite directions and the run rule
+  won, so the code diverges from the document rather than the document being rewritten to
+  match the code. **The document needs entries for the two new views, the two new triggers, and
+  the fuller column lists on the two existing views before this is merged.** No table, column,
+  enum or constraint changed, so the rest of it is still accurate. This is the same debt Phase
+  5 left with `0015` — the four entries it asked for are still outstanding.
+- **`docs/01-PRODUCT.md` says nothing about a fill-up writing an expense.** Assumption 8. If
+  the intent was for fuel spend to live only in the fuel log, the switch should default off.
+- **The consumption chart is not Recharts.** Assumption 14. That is a divergence from CLAUDE.md
+  section 2 rather than from `docs/`, and it is recorded rather than papered over.
+
+### Migration
+
+**One, and it needs a push.** `supabase db push` is blocked in this run, so:
+
+- `0016_service_fuel_parts.sql` — `seed_service_schedules()` and its trigger on `vehicles`,
+  `roll_up_service_schedule()` and its trigger on `service_records`, `v_service_due`,
+  `v_fuel_consumption`, `v_fuel_summary`, and their grants. **No table changes, no new columns,
+  no new enums, no data touched.** It replays clean from zero.
+
+  **One thing to know before pushing:** the seeding trigger fires on *insert*, so vehicles that
+  already exist in production will not get the seven default schedules. They will show
+  "Nothing scheduled" on the vehicle home until items are added by hand. A backfill was
+  deliberately not written into the migration — it would be a data change in a schema
+  migration, and it needs a decision about what `last_done_*` should be for a car that has been
+  serviced for months without the app knowing. The one-liner, if you want it after the push:
+
+  ```sql
+  insert into public.service_schedules (user_id, vehicle_id, name, interval_km, interval_months)
+  select v.user_id, v.id, d.name, d.km, d.months
+  from public.vehicles v
+  cross join (values
+    ('Engine oil + filter', 5000, 6), ('Air filter', 15000, 12), ('Brake fluid', null, 24),
+    ('Coolant', 40000, 24), ('Spark plugs', 40000, null), ('Transmission fluid', 60000, null),
+    ('Tyre rotation', 10000, null)
+  ) as d(name, km, months)
+  where not exists (select 1 from public.service_schedules s where s.vehicle_id = v.id);
+  ```
+
+`lib/supabase/types.ts` was regenerated (`npm run db:types`) and is committed with it.
+
+### Not built, and why
+
+- **A backfill of default schedules for existing vehicles.** Per the migration note above: it
+  is a data change and it needs a decision, not a guess.
+- **Milestones.** `docs/01-PRODUCT.md` section H lists "10 fill-ups" and "first full service
+  cycle" as automatic milestones. Milestone detection is roadmap Phase 8 and the `milestones`
+  table is untouched.
+- **Funds.** Section G, roadmap Phase 7. Nothing here touches `funds` or `fund_contributions`.
+- **The stamp treatment for a service record.** Signature element 3 in `docs/03-DESIGN.md`,
+  listed under Phase 8. A service record is an ordinary row in the history and an ordinary row
+  in the build log until then.
+- **Editing a service record from the history.** The row can be removed and re-entered; there
+  is no edit sheet. `updateServiceRecordAction` exists and is tested but nothing calls it —
+  the schedule sheet and the mark-done sheet are the two a person needs standing next to a car,
+  and a third would have been a third sheet on a route that has to stay small.
+- **Warranty expiry as anything but a line on a row.** No reminder, no badge, no state. A
+  warranty that has run out simply stops being mentioned. Nagging is rude here too.
+- **A "consumption changed meaningfully after this mod" detection.** `docs/01-PRODUCT.md`
+  describes the marker as automatic and it is — every installed mod is marked. What is not
+  built is the *judgement* that the change was meaningful, which needs a threshold nobody has
+  specified and which would make the app claim a causal link it cannot support.
+- **Reordering the schedule by hand.** It is ordered by urgency, which is the order that
+  matters, and `service_schedules` has no `sort_order` column to persist anything else in.
+- **A sweep for orphaned storage objects.** Owed since Phase 3. This phase adds no new source
+  of them.
+
+### Where confidence is low
+
+- **The lazy expense form has never been tapped by a finger.** It is the one thing in this
+  phase that changes an interaction outside it, the preload-on-pointerdown is reasoned about
+  rather than felt, and the failure mode — a grey rectangle where the amount field should be —
+  would be obvious and annoying. Open `/today`, tap the brick FAB, and see whether the amount
+  field is there when the sheet finishes sliding up. If it is not, the revert is two imports
+  and one deleted file, and it is described in the route-size section above.
+- **Nothing was driven through a real browser, again.** Sixty checks went through the
+  production build over HTTP and the arithmetic is pinned down three ways, but the sparkline's
+  proportions, whether the due gauge reads as a gauge at 48px, and whether the price-per-litre
+  line is where your eye goes are all judgements only a person can make.
+- **The chart's y-axis padding is a guess.** Fifteen per cent of the range above and below,
+  which looks right for a car whose consumption moves by a litre or two and may look absurd for
+  one that has never varied. The floor and ceiling are printed underneath, so at least the
+  scale is never a lie.
+- **`v_fuel_consumption` orders by date and breaks ties on the odometer.** A day with two
+  fill-ups at the same reading cannot exist — the unique key forbids it — but two on the same
+  day at different readings are ordered by the clock, which is right, and two on the same day
+  entered in the wrong order would produce one interval with a negative distance that is then
+  dropped. The user would see a missing figure rather than a wrong one, which is the right
+  failure, but they would have no idea why.
+- **The parts screen has no pagination and no virtualisation.** An inventory is a dozen things.
+  Forty parts would render forty rows.
+- **`roll_up_service_schedule` runs once per row.** Deleting a hundred service records in one
+  statement recomputes the schedule a hundred times. Nothing in the app deletes more than one.
+- **Two foreign keys from `parts` into `expenses` made one query silently wrong** — a bare
+  `expenses(...)` embed is ambiguous, PostgREST refuses the whole select, and the removal
+  returned an error the sheet showed but the probe's first version did not check. It is fixed,
+  and there is now a database test that resolves both keys by name so it cannot come back
+  quietly. Worth knowing the shape of, because `parts` is the only table in the schema with two
+  keys into the same table.
+
+### What a reviewer should check first
+
+1. **The lazy expense form, on your phone.** Tap the FAB on `/today` and tap a row in the
+   ledger. This is the one change in the branch that touches a screen the phase did not ask
+   about, and the one judgement that is genuinely yours. Everything else in the branch stands
+   whether you keep it or revert it.
+2. **`supabase db push` for `0016_service_fuel_parts.sql`**, after a backup as usual. Additive,
+   no data touched — but read the backfill note first: your existing cars will have an empty
+   service book until you run it or add items by hand.
+3. **The doc debt in `docs/02-DATA-MODEL.md`**, per the Docs section. Two new views, two new
+   triggers, and fuller column lists on `v_service_due` and `v_fuel_consumption` — plus the
+   four entries Phase 5 still owes.
+4. **Log two real full tanks and check the number against your own arithmetic.** That is the
+   acceptance criterion and the working is above; the app should agree with the back of your
+   receipt to the second decimal place.
+5. **Type a fill-up wrong on purpose** — 4 litres instead of 40 — and watch the price-per-litre
+   line. If a decimal in the wrong place is not obvious there, that field is not doing its job.
+6. **Mark a service done with the expense switch on, then check the ledger and the gauge.** One
+   flow, one confirmation, and the schedule should move without you touching it.
+7. **Sell a part off a mod and check the mod's actual.** Buy at twelve, sell at three, read
+   nine — on the card, on the vehicle page's planning accuracy, and in the ledger as one row
+   with a minus in front of it.

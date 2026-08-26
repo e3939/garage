@@ -25,6 +25,8 @@ type LedgerRowButtonProps = {
    */
   lowOdometer?: boolean
   onOpen: () => void
+  /** Fired as the finger lands, for warming what the tap is about to open. */
+  onPointerDown?: () => void
 }
 
 /**
@@ -41,6 +43,7 @@ export function LedgerRowButton({
   signals,
   lowOdometer = false,
   onOpen,
+  onPointerDown,
 }: LedgerRowButtonProps) {
   const title = row.merchant ?? row.category_name ?? 'Expense'
   const detail = [row.merchant ? row.category_name : null, row.vehicle_nickname]
@@ -58,6 +61,7 @@ export function LedgerRowButton({
     <button
       type="button"
       onClick={onOpen}
+      onPointerDown={onPointerDown}
       style={{ height: LEDGER_ROW_HEIGHT }}
       className={[
         'flex w-full items-center gap-3 border-b border-border px-4 text-left',

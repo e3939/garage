@@ -1,7 +1,6 @@
 // Pointer-event dragging, optimistic writes and three sheets. All of it browser.
 'use client'
 
-import dynamic from 'next/dynamic'
 import {
   startTransition,
   useCallback,
@@ -18,6 +17,7 @@ import { ModCardView } from '@/components/mods/mod-card'
 import { ModSheet } from '@/components/mods/mod-sheet'
 import type { ModIcons } from '@/components/mods/mod-icons'
 import type { ExpenseFormProps, ExpensePrefill } from '@/components/expenses/expense-form'
+import { LazyExpenseForm } from '@/components/expenses/expense-form-lazy'
 import { Fab } from '@/components/ui/fab'
 import { Money } from '@/components/ui/money'
 import { Sheet } from '@/components/ui/sheet'
@@ -33,17 +33,6 @@ import {
   type ModBoard as Board,
   type ModCard,
 } from '@/lib/mods/types'
-
-/**
- * The expense form is the heaviest thing in the app's client bundle and this
- * screen needs it only on the tap that marks a mod installed. Loaded here it is
- * a chunk fetched at that moment rather than weight on a board nobody has
- * finished planning yet.
- */
-const ExpenseForm = dynamic(
-  () => import('@/components/expenses/expense-form').then((module) => module.ExpenseForm),
-  { ssr: false },
-)
 
 /** How close to the edge of the track a finger has to be to make it scroll. */
 const EDGE = 56
@@ -516,7 +505,7 @@ export function ModBoard({
         title={installing ? `Log ${installing.title}` : 'Log expense'}
       >
         {installing && installPrefill ? (
-          <ExpenseForm
+          <LazyExpenseForm
             key={installing.id}
             mode="create"
             prefill={installPrefill}

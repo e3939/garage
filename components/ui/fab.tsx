@@ -2,6 +2,12 @@ import type { ReactNode } from 'react'
 
 type FabProps = {
   onClick: () => void
+  /**
+   * Fired as the finger lands, before the click. For warming whatever the tap
+   * is about to open — a lazy chunk gets a head start of however long the tap
+   * itself lasts, which is most of the time it needs.
+   */
+  onPointerDown?: () => void
   /** Named for a screen reader; the glyph carries it visually. */
   label: string
   children: ReactNode
@@ -16,11 +22,12 @@ type FabProps = {
  * by hand somewhere else is how two buttons that must look identical stop
  * being identical.
  */
-export function Fab({ onClick, label, children }: FabProps) {
+export function Fab({ onClick, onPointerDown, label, children }: FabProps) {
   return (
     <button
       type="button"
       onClick={onClick}
+      onPointerDown={onPointerDown}
       className={[
         'fixed bottom-nav right-4 z-30 flex size-fab items-center justify-center',
         'rounded-full bg-accent text-accent-ink',

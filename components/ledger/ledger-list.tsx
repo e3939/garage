@@ -10,7 +10,7 @@ import {
   restoreExpenseAction,
 } from '@/app/(app)/expenses/actions'
 import { loadAttachmentsAction } from '@/app/(app)/attachments/actions'
-import { ExpenseForm } from '@/components/expenses/expense-form'
+import { LazyExpenseForm, preloadExpenseForm } from '@/components/expenses/expense-form-lazy'
 import { useExpenseStore } from '@/components/expenses/expense-store'
 import { LedgerDayHeading, LedgerRowButton, LEDGER_DAY_HEIGHT, LEDGER_ROW_HEIGHT } from '@/components/ledger/ledger-row'
 import type { LedgerSignalIcons } from '@/components/ledger/row-signals'
@@ -211,6 +211,7 @@ export function LedgerList({
                 signals={signals}
                 lowOdometer={isBelowLastReading(item.row)}
                 onOpen={() => open(item.row)}
+                onPointerDown={preloadExpenseForm}
               />
             )
           }
@@ -242,7 +243,7 @@ export function LedgerList({
         }
       >
         {editing && photosFor === editing.id ? (
-          <ExpenseForm
+          <LazyExpenseForm
             // Remounted per expense, so the form's own state starts from the
             // row and its photos rather than from whatever was open before.
             key={editing.id}

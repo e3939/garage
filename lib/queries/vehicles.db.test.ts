@@ -408,6 +408,11 @@ describe.skipIf(!ENABLED)('Phase 3 read paths', () => {
       expect(vehicle.purchase_odometer_km).toBe(88_000)
       expect(vehicle.odometer_km).toBe(88_000)
 
+      // Every vehicle now arrives with the seven seeded service schedules
+      // (migration 0016), and that foreign key is not a cascade — the app
+      // archives a car rather than deleting it, so nothing in it ever does this.
+      // The probe still has to clean up after itself.
+      await rest(`service_schedules?vehicle_id=eq.${rows[0]!.id}`, { method: 'DELETE' })
       await rest(`vehicles?id=eq.${rows[0]!.id}`, { method: 'DELETE' })
     })
 
