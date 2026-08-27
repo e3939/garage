@@ -5,18 +5,13 @@ import { useEffect, useRef, useState } from 'react'
 
 import { discardVehiclePhotoAction } from '@/app/(app)/garage/actions'
 import { Button } from '@/components/ui/button'
+import { IMAGE_BUDGETS, MAX_INPUT_BYTES } from '@/lib/images/budgets'
 
 /** docs/02-DATA-MODEL.md: object paths are {user_id}/{vehicle_id}/{uuid}.webp. */
 const BUCKET = 'vehicles'
 
-/** Long edge, in pixels. A hero on a 3x phone is 1170 wide; 1600 leaves room. */
-const MAX_EDGE = 1600
-
-/** Roughly 400KB. The library takes megabytes. */
-const MAX_MB = 0.4
-
-/** Bigger than this and something has gone wrong before we ever see it. */
-const MAX_INPUT_BYTES = 32 * 1024 * 1024
+/** Every number that decides how hard this is squeezed. */
+const BUDGET = IMAGE_BUDGETS.hero
 
 type Stage = 'idle' | 'compressing' | 'uploading' | 'error'
 
@@ -38,9 +33,12 @@ type HeroPhotoFieldProps = {
  * A photo straight off a phone is three to eight megabytes of JPEG, and the
  * screen it lands on is 390 points wide. Uploading the original would cost the
  * user their data allowance, cost the app its storage, and cost every later page
- * load the time to send it back down again. So it is resized to a 1600px long
- * edge and re-encoded as WebP at roughly 400KB before the first byte leaves the
- * device — CLAUDE.md section 2, "Client-side before upload, always".
+ * load the time to send it back down again. So it is resized and re-encoded as
+ * WebP before the first byte leaves the device — CLAUDE.md section 2,
+ * "Client-side before upload, always".
+ *
+ * How hard is `IMAGE_BUDGETS.hero`, and it is deliberately the most generous of
+ * the three: this is the one image in the app someone actually looks at.
  *
  * The library is imported dynamically, so its weight lands only on the person
  * who actually picks a photo and never in the route's initial JavaScript.
@@ -105,8 +103,8 @@ export function HeroPhotoField({
       ])
 
       const compressed = await compress(file, {
-        maxWidthOrHeight: MAX_EDGE,
-        maxSizeMB: MAX_MB,
+        maxWidthOrHeight: BUDGET.maxEdge,
+        maxSizeMB: BUDGET.maxMB,
         fileType: 'image/webp',
         useWebWorker: true,
         onProgress: (percent) => setProgress(percent),

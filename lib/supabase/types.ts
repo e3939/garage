@@ -632,6 +632,164 @@ export type Database = {
           },
         ]
       }
+      gallery_albums: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          occurred_on: string | null
+          updated_at: string
+          user_id: string
+          vehicle_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          occurred_on?: string | null
+          updated_at?: string
+          user_id: string
+          vehicle_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          occurred_on?: string | null
+          updated_at?: string
+          user_id?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_albums_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_fuel_summary"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "gallery_albums_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "gallery_albums_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "gallery_albums_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gallery_photos: {
+        Row: {
+          album_id: string | null
+          bytes: number
+          caption: string | null
+          captured_at: string | null
+          content_type: string
+          created_at: string
+          height: number | null
+          id: string
+          occurred_on: string
+          odometer_km: number | null
+          original_filename: string
+          storage_path: string
+          thumb_path: string | null
+          updated_at: string
+          user_id: string
+          vehicle_id: string
+          width: number | null
+        }
+        Insert: {
+          album_id?: string | null
+          bytes: number
+          caption?: string | null
+          captured_at?: string | null
+          content_type: string
+          created_at?: string
+          height?: number | null
+          id?: string
+          occurred_on: string
+          odometer_km?: number | null
+          original_filename: string
+          storage_path: string
+          thumb_path?: string | null
+          updated_at?: string
+          user_id: string
+          vehicle_id: string
+          width?: number | null
+        }
+        Update: {
+          album_id?: string | null
+          bytes?: number
+          caption?: string | null
+          captured_at?: string | null
+          content_type?: string
+          created_at?: string
+          height?: number | null
+          id?: string
+          occurred_on?: string
+          odometer_km?: number | null
+          original_filename?: string
+          storage_path?: string
+          thumb_path?: string | null
+          updated_at?: string
+          user_id?: string
+          vehicle_id?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_photos_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_albums"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gallery_photos_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_fuel_summary"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "gallery_photos_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_closing"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "gallery_photos_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "v_vehicle_totals"
+            referencedColumns: ["vehicle_id"]
+          },
+          {
+            foreignKeyName: "gallery_photos_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       milestones: {
         Row: {
           achieved_on: string
@@ -2003,6 +2161,14 @@ export type Database = {
           },
         ]
       }
+      v_storage_usage: {
+        Row: {
+          bucket_id: string | null
+          bytes: number | null
+          objects: number | null
+        }
+        Relationships: []
+      }
       v_timeline: {
         Row: {
           amount: number | null
@@ -2295,6 +2461,7 @@ export type Database = {
         | "fuel"
         | "milestone"
         | "note"
+        | "gallery"
       vehicle_status: "owned" | "sold"
     }
     CompositeTypes: {
@@ -2439,7 +2606,15 @@ export const Constants = {
       ],
       part_status: ["on_car", "shelf", "sold", "binned"],
       recurrence: ["monthly", "quarterly", "yearly"],
-      timeline_kind: ["expense", "mod", "service", "fuel", "milestone", "note"],
+      timeline_kind: [
+        "expense",
+        "mod",
+        "service",
+        "fuel",
+        "milestone",
+        "note",
+        "gallery",
+      ],
       vehicle_status: ["owned", "sold"],
     },
   },

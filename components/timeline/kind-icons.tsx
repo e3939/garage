@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import {
+  Camera,
   GasPump,
   Gauge,
   ICON_UI,
@@ -18,7 +19,7 @@ export type TimelineKindIcons = Readonly<Record<TimelineKind, ReactNode>>
  * mapping table in docs/03-DESIGN.md: an expense is a `Receipt`, a mod is a
  * `Gauge`, service is a `Wrench`, fuel is a `GasPump`, a milestone is a
  * `SealCheck`. A timeline note is a `NoteBlank`, which the ledger already uses
- * to mean "there are words here".
+ * to mean "there are words here". A gallery photo is the canonical `Camera`.
  *
  * Drawn once on the server and handed to the feed as elements, the same way the
  * ledger's category icons and row signals are, so the feed's client bundle holds
@@ -32,5 +33,6 @@ export function timelineKindIcons(): TimelineKindIcons {
     fuel: <GasPump {...ICON_UI} aria-hidden />,
     milestone: <SealCheck {...ICON_UI} aria-hidden />,
     note: <NoteBlank {...ICON_UI} aria-hidden />,
+    gallery: <Camera {...ICON_UI} aria-hidden />,
   }
 }

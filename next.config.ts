@@ -1,5 +1,7 @@
 import type { NextConfig } from 'next'
 
+import { DISPLAY_QUALITY } from './lib/images/budgets'
+
 /**
  * Storage is private, so every image in the app arrives as a signed URL on the
  * Supabase host. `next/image` refuses a remote host it has not been told about,
@@ -37,6 +39,11 @@ const nextConfig: NextConfig = {
   agentRules: false,
   images: {
     remotePatterns: supabaseImagePattern(),
+    // Next re-encodes at 75 by default, which is a second lossy pass over a
+    // file the browser already compressed. 90 is what the hero and the
+    // full-screen viewer ask for; a quality not listed here is refused, so
+    // this list and DISPLAY_QUALITY in lib/images/budgets.ts move together.
+    qualities: [75, DISPLAY_QUALITY],
   },
   experimental: {
     // Phosphor ships one module per icon; this keeps the barrel import from

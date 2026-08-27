@@ -1,6 +1,7 @@
 import Image from 'next/image'
 
 import { Car, ICON_EMPTY } from '@/components/icons'
+import { DISPLAY_QUALITY } from '@/lib/images/budgets'
 import { dateLabel } from '@/lib/dates-display'
 import { heroAlt, specStripParts, vehicleColour, type Vehicle } from '@/lib/vehicles/types'
 
@@ -19,6 +20,11 @@ type VehicleHeroProps = {
  * (CLAUDE.md section 3). `priority` is set because on this screen the hero is
  * the largest contentful paint by definition.
  *
+ * `quality` is raised above Next's default 75 because the source is already a
+ * compressed WebP and re-encoding it at 75 is a second lossy pass — generation
+ * loss shows worst in flat areas of colour, which on a photo of a car is the
+ * paint. See lib/images/budgets.ts.
+ *
  * A field nobody filled in is left out of the strip rather than shown as a dash.
  * An empty slot in a spec strip reads as a fault in the car; a shorter strip
  * reads as a shorter strip.
@@ -36,6 +42,7 @@ export function VehicleHero({ vehicle, heroUrl, locale }: VehicleHeroProps) {
             fill
             priority
             sizes="(min-width: 640px) 640px, 100vw"
+            quality={DISPLAY_QUALITY}
             className="object-cover"
           />
         ) : (

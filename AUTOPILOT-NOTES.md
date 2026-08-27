@@ -3293,3 +3293,143 @@ silently again.
 3. **Any amount, anywhere.** The `₫` should now sit at the same width as the digits before it.
 4. **A write on a bad connection.** Log an expense with the connection throttled, and confirm
    one expense appears rather than two.
+
+---
+
+## Compression budgets, and the gallery
+
+Not a phase. Written 27 August 2026.
+
+### Part 1 — the compression was too hard, in two places
+
+**What was wrong.** One budget, 1600px and 400KB, shared by a hero that fills the screen and
+a receipt nobody looks at twice. On a 4:3 photo that is 1.92 megapixels and works out to
+**1.71 bits per pixel**. `browser-image-compression` meets a byte ceiling by winding quality
+down until the file fits, and WebP starts showing blocking on photographic content below
+roughly 1.5 bits per pixel — so a smooth photo cleared it and a car shot against foliage,
+gravel or textured tarmac did not.
+
+**Resolution was never the problem.** Traced before changing anything:
+
+| Surface | Device pixels needed | 1600px source gave |
+|---|---|---|
+| Hero, 16:9 full-bleed, iPhone 15 (390pt @3x) | 1170 wide | enough |
+| Hero, Pro Max (430pt @3x) | 1290 wide | enough |
+| Full-screen viewer, portrait photo, Pro Max | ~2796 tall | **short** |
+
+Only the viewer was genuinely starved of pixels. The hero was starved of bits.
+
+**And there was a second squeeze.** Everything renders through `next/image`, which re-encodes
+at quality 75 by default — `next.config.ts` set no `quality` and no `qualities` at all. A
+second lossy pass over an already-lossy file, and generation loss shows worst in large flat
+areas of colour, which on a photo of a car is the paint. Plausibly the larger half of the
+problem, and free to fix.
+
+**What was applied.** One module, `lib/images/budgets.ts`, holding every number:
+
+| Role | Long edge | Ceiling | bits/px |
+|---|---|---|---|
+| Hero / before-after | 2560 | 1.5MB | 2.56 |
+| Inspiration, progress, parts | 2048 | 1.0MB | 2.67 |
+| Receipts, service, fuel | 2000 | 0.6MB | 1.68 |
+
+Plus `DISPLAY_QUALITY = 90` on the hero and the before/after slider, `images.qualities:
+[75, 90]` in `next.config.ts` — Next refuses a quality not on that list — and `unoptimized`
+on the full-screen viewer, which was already receiving a correctly-sized WebP and only ever
+stood to lose from a second pass.
+
+Which budget applies follows what owns the photo: `ATTACHMENT_TARGET` in
+`lib/attachments/types.ts` now carries a `role` alongside its bucket and kind, so a receipt
+and an inspiration shot are squeezed differently without any call site deciding.
+
+**Storage cost.** Heroes are one per vehicle, so their budget is free in practice. Receipts
+are the volume item and were deliberately kept tightest: three hundred of them at 0.6MB is
+180MB of a 1GB quota.
+
+### Part 2 — the gallery
+
+**Albums, not tags**, and the reasoning is in `docs/02-DATA-MODEL.md` rather than only here:
+the grouping people want is an event, and an event is a container rather than an attribute.
+One nullable foreign key instead of a join table, a tag vocabulary and the rename-and-merge
+tooling a free-text vocabulary always ends up needing. Reversible in the cheap direction.
+
+**Two migrations, not one.** `0021_gallery_kind.sql` does nothing but add `'gallery'` to the
+`timeline_kind` enum, because Postgres will not let a value added to an enum be *used* in the
+transaction that added it, and the CLI runs each file in its own transaction.
+`0022_gallery.sql` is everything else.
+
+**What 0022 contains:** `gallery_albums` and `gallery_photos`, four RLS policies each,
+explicit grants, the `gallery` bucket with a 50MB per-object ceiling and a MIME allow-list,
+four storage policies, `v_storage_usage`, `v_timeline` recreated with a gallery branch, and
+the same guard block `0007` runs — re-run at the end so a table added here that lost a policy
+fails the reset rather than shipping open.
+
+**Proof the bucket holds.** `npm run test:db`, against a database reset from zero. 210
+assertions, up from 205, and the five new ones are all gallery:
+
+| Check | Result |
+|---|---|
+| First user sees their own `gallery_albums` and `gallery_photos` (positive control) | passes |
+| Second user sees either | **zero rows** |
+| Second user downloads the first user's original | rejected |
+| Second user mints a signed URL for it | rejected |
+| Second user uploads into the first user's folder | rejected |
+| Second user deletes it | rejected, and the object survives |
+
+The signed-URL case is worth calling out separately: it is how the app actually serves these
+files, so "cannot download directly" would not have been enough on its own.
+
+### Assumptions
+
+1. **`thumb_path` is nullable and that is the design, not a gap.** Making a thumbnail means
+   drawing the image into a canvas, and only Safari does that with a HEIC. On the phone this
+   was built for it works. In a desktop Chrome it does not, and the upload proceeds with no
+   thumbnail and a plain tile rather than being refused. The original is unaffected.
+2. **Server-side thumbnailing is not available and was not attempted.** `sharp` in this
+   project reads HEIC metadata but fails to decode the pixels — only AVIF is built in. It
+   could not have been used anyway: Vercel caps a function's request body at 4.5MB and a
+   phone photo is routinely more, so the upload has to go browser-to-storage directly.
+3. **One timeline row per photo, not per album.** An album row would hide the eleven photos
+   behind it, and `ref_id` has to identify one thing so the feed can open it. Collapsing per
+   album the way fuel collapses per month is a `timeline_page` change and was left alone.
+4. **Gallery photos do not feed `vehicles.odometer_km`.** That column is documented as the
+   max across expenses, fuel logs and service records. A photo is not a reading.
+5. **Deleting an album never deletes photos** — `on delete set null`, so they come loose
+   rather than vanishing with the folder they were filed under.
+6. **Storage before rows on delete.** The other order can leave a row pointing at nothing,
+   which renders as a broken tile. This order can at worst leave an object with no row, which
+   is invisible — and `v_storage_usage` reads storage rather than rows, so it still counts,
+   rather than quietly under-reporting the quota.
+7. **Bulk download is serialised with a 600ms gap.** A browser silently drops all but the
+   first of a burst of programmatic downloads, so a loop of twelve clicks delivers one photo
+   and looks broken.
+
+### What could not be verified without a phone
+
+- **The compression result.** No real photo was measured. There is no photograph in the repo,
+  and the only real photographic images on this machine are macOS wallpapers not available at
+  full resolution — the ones that are on disk are smooth gradients and would have flattered
+  the settings. Everything in Part 1 is arithmetic and code-path tracing. If 2560 and 1.5MB
+  still is not enough, raise the numbers in `lib/images/budgets.ts`; that is the whole reason
+  they are in one file.
+- **A real HEIC upload.** The thumbnail path, the EXIF-free date fallback and the iOS picker
+  have never seen an actual `.HEIC` off a camera. The row shape and the RLS around it are
+  proved; the browser half is not.
+- **Whether the download actually saves on iOS Safari.** A programmatic `<a download>` on a
+  cross-origin signed URL behaves differently there than on a desktop.
+- **How the grid feels at two hundred photos.** It is not virtualised. `docs/03-DESIGN.md`
+  requires virtualisation past forty rows, and a three-column grid of forty rows is a hundred
+  and twenty tiles — this will need it, and does not have it yet.
+
+### What a reviewer should check first
+
+1. **The hero photo, before anything else.** Re-upload it — the new budget only applies to a
+   new upload, and the one in the database now is still the 1600px/400KB copy.
+2. **Push the migrations.** Three are pending, not one: `0019`, `0020` and now `0021` and
+   `0022`. Take the backup first.
+3. **Upload a HEIC from the phone**, then download it back and check the file that lands is
+   byte-identical and still named what it was called.
+4. **The storage meter**, on the gallery screen and in Settings. It reads real bucket usage,
+   so it will show more than the gallery alone.
+5. **Fill the quota deliberately** if you want to see the ceiling behave: the check runs
+   before a byte is sent and names what would not fit.

@@ -185,6 +185,11 @@ export function PhotoViewer({ photos, index, context, onClose }: PhotoViewerProp
                       /* The one the viewer opened on is wanted now; its
                          neighbours are wanted the moment a thumb moves. */
                       priority={position === Math.max(0, index)}
+                      /* Served exactly as stored. The upload is already a WebP
+                         sized for a full screen, so putting it through the
+                         optimiser here only spends a second lossy pass to
+                         arrive at the same pixels. See lib/images/budgets.ts. */
+                      unoptimized
                       className="object-contain"
                       draggable={false}
                     />

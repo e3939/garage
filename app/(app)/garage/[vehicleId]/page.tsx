@@ -230,6 +230,15 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
           </li>
           <li className="border-t border-border">
             <Link
+              href={`/garage/${vehicle.id}/gallery` as Route}
+              className="flex min-h-touch items-center justify-between gap-4 px-4 py-3"
+            >
+              <span className="text-body text-ink">Gallery</span>
+              <span className="text-caption text-ink-muted">Photos at full size</span>
+            </Link>
+          </li>
+          <li className="border-t border-border">
+            <Link
               href={`/garage/${vehicle.id}/edit` as Route}
               className="flex min-h-touch items-center justify-between gap-4 px-4 py-3"
             >

@@ -121,6 +121,8 @@ const TABLES = [
   'funds',
   'fund_contributions',
   'recurring_expenses',
+  'gallery_albums',
+  'gallery_photos',
 ] as const
 
 /** Ids Alice created, per table, so Bob can be checked against them precisely. */
@@ -286,6 +288,29 @@ describe.skipIf(!ENABLED)('local stack', () => {
       expense_id: expense.id,
     })
     aliceRows.attachments = [attachment.id as string]
+
+    const album = await insert(alice, 'gallery_albums', {
+      user_id: alice.id,
+      vehicle_id: vehicleId,
+      name: 'RLS probe album',
+      occurred_on: '2026-08-20',
+    })
+    aliceRows.gallery_albums = [album.id as string]
+
+    const galleryPhoto = await insert(alice, 'gallery_photos', {
+      user_id: alice.id,
+      vehicle_id: vehicleId,
+      album_id: album.id,
+      storage_path: `${alice.id}/${vehicleId}/probe-original.heic`,
+      thumb_path: `${alice.id}/${vehicleId}/probe-original-thumb.webp`,
+      original_filename: 'IMG_0001.HEIC',
+      content_type: 'image/heic',
+      bytes: 3_145_728,
+      width: 4032,
+      height: 3024,
+      occurred_on: '2026-08-20',
+    })
+    aliceRows.gallery_photos = [galleryPhoto.id as string]
   }, 120_000)
 
   it('gives a new user the fifteen system categories on first sign-in', async () => {
@@ -467,6 +492,77 @@ describe.skipIf(!ENABLED)('local stack', () => {
         body: 'not yours',
       })
       expect(stolen.status).toBeGreaterThanOrEqual(400)
+    })
+
+    /**
+     * The gallery bucket, proved separately from the other three.
+     *
+     * It is the one that holds originals rather than compressed copies, so it
+     * is the one where a policy mistake costs the most, and it was added in
+     * 0022 rather than 0008 -- a new bucket inherits nothing.
+     */
+    it("keeps the first user's gallery originals out of the second user's reach", async () => {
+      const path = `${alice.id}/original.bin`
+
+      const uploaded = await fetch(`${stack.apiUrl}/storage/v1/object/gallery/${path}`, {
+        method: 'POST',
+        headers: {
+          apikey: stack.publishableKey,
+          authorization: `Bearer ${alice.token}`,
+          'content-type': 'image/heic',
+        },
+        body: 'pretend this is a five megabyte photograph',
+      })
+      expect(uploaded.status).toBe(200)
+
+      const mine = await fetch(`${stack.apiUrl}/storage/v1/object/gallery/${path}`, {
+        headers: { apikey: stack.publishableKey, authorization: `Bearer ${alice.token}` },
+      })
+      expect(mine.status).toBe(200)
+
+      const theirs = await fetch(`${stack.apiUrl}/storage/v1/object/gallery/${path}`, {
+        headers: { apikey: stack.publishableKey, authorization: `Bearer ${bob.token}` },
+      })
+      expect(theirs.status).toBeGreaterThanOrEqual(400)
+
+      // A signed URL is how the app serves these, so the second user must not
+      // be able to mint one either.
+      const signed = await fetch(`${stack.apiUrl}/storage/v1/object/sign/gallery/${path}`, {
+        method: 'POST',
+        headers: {
+          apikey: stack.publishableKey,
+          authorization: `Bearer ${bob.token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ expiresIn: 3600 }),
+      })
+      expect(signed.status).toBeGreaterThanOrEqual(400)
+
+      const stolen = await fetch(
+        `${stack.apiUrl}/storage/v1/object/gallery/${alice.id}/not-yours.bin`,
+        {
+          method: 'POST',
+          headers: {
+            apikey: stack.publishableKey,
+            authorization: `Bearer ${bob.token}`,
+            'content-type': 'image/heic',
+          },
+          body: 'not yours',
+        },
+      )
+      expect(stolen.status).toBeGreaterThanOrEqual(400)
+
+      const deleted = await fetch(`${stack.apiUrl}/storage/v1/object/gallery/${path}`, {
+        method: 'DELETE',
+        headers: { apikey: stack.publishableKey, authorization: `Bearer ${bob.token}` },
+      })
+      expect(deleted.status).toBeGreaterThanOrEqual(400)
+
+      // Still Alice's, untouched.
+      const survivor = await fetch(`${stack.apiUrl}/storage/v1/object/gallery/${path}`, {
+        headers: { apikey: stack.publishableKey, authorization: `Bearer ${alice.token}` },
+      })
+      expect(survivor.status).toBe(200)
     })
   })
 })

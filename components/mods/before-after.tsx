@@ -2,6 +2,8 @@
 'use client'
 
 import Image from 'next/image'
+
+import { DISPLAY_QUALITY } from '@/lib/images/budgets'
 import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 
 import { Grip } from '@/components/icons/grip'
@@ -87,6 +89,7 @@ export function BeforeAfter({ heroUrl, vehicleName, photos }: BeforeAfterProps) 
           alt={`${vehicleName} as it is now`}
           fill
           sizes="(min-width: 640px) 640px, 100vw"
+          quality={DISPLAY_QUALITY}
           className="object-cover"
         />
 
@@ -99,6 +102,7 @@ export function BeforeAfter({ heroUrl, vehicleName, photos }: BeforeAfterProps) 
             alt={photoAlt(after.caption, `${after.mod_title} on ${vehicleName}`)}
             fill
             sizes="(min-width: 640px) 640px, 100vw"
+            quality={DISPLAY_QUALITY}
             className="object-cover"
           />
         </div>

@@ -8,6 +8,7 @@ import { discardUploadAction } from '@/app/(app)/attachments/actions'
 import { Button } from '@/components/ui/button'
 import { INPUT_CLASS } from '@/components/ui/field'
 import { Thumbnail } from '@/components/attachments/thumbnail'
+import { IMAGE_BUDGETS, MAX_INPUT_BYTES } from '@/lib/images/budgets'
 import {
   ATTACHMENT_TARGET,
   uploadPath,
@@ -16,14 +17,6 @@ import {
   type AttachmentView,
 } from '@/lib/attachments/types'
 
-/** Long edge in pixels. A phone screen is 390pt; 1600 survives a pinch zoom. */
-const MAX_EDGE = 1600
-
-/** Roughly 400KB of WebP. The library takes megabytes. */
-const MAX_MB = 0.4
-
-/** Bigger than this and something has gone wrong before we ever see it. */
-const MAX_INPUT_BYTES = 32 * 1024 * 1024
 
 /** The list schema's ceiling. Twelve photos is a thorough day in the garage. */
 const MAX_PHOTOS = 12
@@ -135,6 +128,8 @@ export function AttachmentField({
   }, [])
 
   const target = ATTACHMENT_TARGET[owner]
+  /** How hard these get squeezed follows what owns them. lib/images/budgets.ts. */
+  const budget = IMAGE_BUDGETS[target.role]
   const busy = progress.some((entry) => entry.stage !== 'error')
   const room = MAX_PHOTOS - value.length
 
@@ -191,8 +186,8 @@ export function AttachmentField({
 
       try {
         const compressed = await compress(file, {
-          maxWidthOrHeight: MAX_EDGE,
-          maxSizeMB: MAX_MB,
+          maxWidthOrHeight: budget.maxEdge,
+          maxSizeMB: budget.maxMB,
           fileType: 'image/webp',
           useWebWorker: true,
           onProgress: (percent) => advance(localId, { percent }),
@@ -417,7 +412,7 @@ export function AttachmentField({
 
       <p className="text-caption text-ink-muted">
         {error ??
-          `Resized to ${MAX_EDGE}px and re-encoded as WebP on this device before anything is sent.`}
+          budget.note}
       </p>
     </div>
   )

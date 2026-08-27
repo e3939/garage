@@ -23,7 +23,7 @@ create type mod_priority     as enum ('needed', 'next_up', 'someday', 'dreaming'
 create type part_status      as enum ('on_car', 'shelf', 'sold', 'binned');
 create type attachment_kind  as enum ('receipt', 'inspiration', 'progress', 'document');
 create type recurrence       as enum ('monthly', 'quarterly', 'yearly');
-create type timeline_kind    as enum ('expense', 'mod', 'service', 'fuel', 'milestone', 'note');
+create type timeline_kind    as enum ('expense', 'mod', 'service', 'fuel', 'milestone', 'note', 'gallery');
 ```
 
 ---
@@ -283,6 +283,52 @@ auto boolean not null default true
 unique (user_id, vehicle_id, kind) where auto
 ```
 
+### gallery_albums
+Named groups of gallery photos, one per event. A photo belongs to at most one.
+```
+id, user_id, vehicle_id not null
+name text not null check (length(btrim(name)) > 0)
+occurred_on date                                  -- the event's date; null for a standing group
+notes text
+unique (user_id, vehicle_id, lower(btrim(name)))
+```
+Albums rather than tags, deliberately. The grouping people actually want here is an
+event — "wheels fitted", "Hai Van pass" — and an event is a container, not an attribute.
+One nullable foreign key instead of a join table, a tag vocabulary and the rename-and-merge
+tooling a free-text vocabulary always needs. If a photo ever has to be in two places, adding
+a join table is additive; the reverse means picking a primary tag out of a set.
+
+### gallery_photos
+The one place in this app that stores an original. Everything in `attachments` has been
+resized and re-encoded before upload; these are the file exactly as it left the camera,
+HEIC included, and the original is what a download returns.
+```
+id, user_id, vehicle_id not null
+album_id uuid references gallery_albums on delete set null
+storage_path text not null unique                 -- {user_id}/{vehicle_id}/{uuid}.{ext}
+thumb_path text unique                            -- {…}-thumb.webp, nullable, see below
+original_filename text not null
+content_type text not null
+bytes bigint not null check (bytes > 0)
+width int, height int
+captured_at timestamptz                           -- the file's own date, when it has one
+occurred_on date not null                         -- what the timeline sorts by
+caption text
+odometer_km int
+```
+`bytes`, `width`, `height` and `content_type` describe the **original**, never the thumbnail:
+they are what the storage quota is spent on and what a download hands back.
+
+`thumb_path` is nullable on purpose. A thumbnail is made by drawing the image into a canvas,
+and only Safari does that with a HEIC. On a phone it works; in a desktop Chrome it does not,
+and the upload proceeds with no thumbnail rather than being refused. Nothing is lost — the
+original is still there and still downloads.
+
+Deleting an album never deletes its photos: `on delete set null` leaves them unfiled.
+
+Gallery photos do **not** feed `vehicles.odometer_km`. That column is the max across
+expenses, fuel logs and service records, and a photo is not a reading.
+
 ---
 
 ## Views and functions
@@ -326,9 +372,16 @@ Per vehicle: `total_spend` (all car buckets, undiscounted), `running_spend`, `pr
 Per schedule row: `due_km`, `due_date`, `km_remaining`, `days_remaining`, and a
 `state` of `ok` / `due_soon` / `overdue`.
 
+### `v_storage_usage`
+`bucket_id`, `objects`, `bytes` per bucket for the calling user, summed over
+`storage.objects` with `security_invoker = true` so the storage policies decide what is
+visible. Read rather than derived from the app's own rows on purpose: an orphaned object
+still costs quota and should still be counted. The plan's 1GB ceiling is not here — that is
+a billing fact, not a schema one, and lives in `lib/gallery/types.ts`.
+
 ### `v_timeline`
-`union all` over expenses, mod status changes, service records, fuel logs, milestones and
-timeline notes, normalised to
+`union all` over expenses, mod status changes, service records, fuel logs, milestones,
+timeline notes and gallery photos, normalised to
 `(user_id, vehicle_id, occurred_on, kind timeline_kind, ref_id, title, subtitle, amount)`.
 Ordered by `occurred_on desc, created_at desc`. Paginate by keyset, never by offset.
 
@@ -348,7 +401,11 @@ create policy "own_delete" on <t> for delete using (user_id = auth.uid());
 
 Views run with the invoker's rights (`security_invoker = true`) so the base-table policies apply.
 
-**Storage:** three buckets, all private. Object paths are `{user_id}/{vehicle_id}/{uuid}.webp`.
+**Storage:** four buckets, all private. Object paths are `{user_id}/{vehicle_id}/{uuid}.{ext}`.
+Three of them — `receipts`, `inspiration`, `vehicles` — only ever hold `.webp`, because
+everything in them is compressed before upload. The fourth, `gallery`, holds originals and so
+carries whatever extension the camera gave the file. It has a 50MB per-object ceiling and an
+allowed-MIME list set on the bucket itself.
 Policy on each bucket checks `(storage.foldername(name))[1] = auth.uid()::text`.
 Images are served through signed URLs with a 1-hour TTL, generated server-side and cached.
 

@@ -102,6 +102,41 @@ is tight.
 Rule: a screen has at most one `display-lg` and one `odometer-lg`. If a design needs two hero
 numbers, one of them isn't a hero.
 
+### Image budgets
+
+Every photo except a gallery original is resized and re-encoded in the browser before it is
+uploaded. How hard depends on what the photo is for, and the numbers live in one file,
+`lib/images/budgets.ts`.
+
+| Role | Long edge | Ceiling | bits/px | Used by |
+|---|---|---|---|---|
+| Hero / before-after | 2560 | 1.5MB | 2.56 | The vehicle hero, the before/after slider |
+| Inspiration | 2048 | 1.0MB | 2.67 | Mod inspiration, progress and part photos |
+| Receipt | 2000 | 0.6MB | 1.68 | Expenses, service records, fuel logs |
+| Gallery original | none | none | — | Stored byte for byte, see `docs/02-DATA-MODEL.md` |
+
+These were one shared budget of 1600px and 400KB, which is 1.71 bits per pixel on a 4:3
+photo. `browser-image-compression` meets a byte ceiling by winding quality down until the
+file fits, and WebP starts showing blocking on photographic content below roughly 1.5 bits
+per pixel — so a smooth photo survived that and a car shot against foliage or gravel did not.
+The figures above are set so the ceiling rarely binds and the encoder keeps the quality it
+wants. Storage is the only cost, and a hero is one file per vehicle.
+
+**There is a second encode after this one.** Everything renders through `next/image`, which
+re-encodes at quality 75 by default — a second lossy pass over an already-lossy file, and
+generation loss shows worst in large flat areas of colour, which on a photo of a car is the
+paint. So:
+
+- The hero and the before/after slider render at `quality={DISPLAY_QUALITY}`, currently 90.
+  A quality not listed in `images.qualities` in `next.config.ts` is refused, so that list and
+  the constant move together.
+- The full-screen photo viewer renders `unoptimized`. The stored file is already a WebP sized
+  for a full screen; putting it through the optimiser spends a lossy pass to arrive at the
+  same pixels.
+- Gallery thumbnails and originals are plain `<img>`, never `next/image`: they are served
+  from signed URLs that expire in an hour, and the optimiser would cache an optimised copy
+  against a URL that stops resolving.
+
 ### Form controls have a hard 16px minimum
 
 **Never set a font size below 16px on an `input`, `select` or `textarea`.** This is not a
@@ -167,6 +202,7 @@ Canonical mapping (use these, don't improvise per screen):
 | Blocked dependency | `LinkBreak` |
 | Due soon | `WarningCircle` |
 | Add | `Plus` |
+| Gallery photo | `Camera` |
 
 **Absolutely no emoji characters in any string, ever.** Lint rule enforces it: a regex over
 the emoji unicode ranges runs in CI against `app/`, `components/`, `lib/` and `supabase/`.

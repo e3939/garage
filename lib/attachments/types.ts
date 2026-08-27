@@ -1,14 +1,19 @@
+import type { ImageRole } from '@/lib/images/budgets'
 import type { Enums } from '@/lib/supabase/types'
 
 /**
- * The three private buckets from docs/02-DATA-MODEL.md. Object paths are
- * `{user_id}/{vehicle_id}/{uuid}.webp`, and the first segment is what every
+ * The four private buckets from docs/02-DATA-MODEL.md. Object paths are
+ * `{user_id}/{vehicle_id}/{uuid}.{ext}`, and the first segment is what every
  * storage policy checks.
+ *
+ * `gallery` is the odd one: everything in the other three has been compressed
+ * before it was uploaded, and everything in `gallery` is the untouched original,
+ * so its objects are not always `.webp` and are the only ones that can be HEIC.
  *
  * This lives here rather than next to the signing helper because the upload
  * field is a client component and the signing helper is `server-only`.
  */
-export type StorageBucket = 'receipts' | 'inspiration' | 'vehicles'
+export type StorageBucket = 'receipts' | 'inspiration' | 'vehicles' | 'gallery'
 
 export type AttachmentKind = Enums<'attachment_kind'>
 
@@ -36,20 +41,28 @@ export type AttachmentDraft = {
 export type AttachmentView = AttachmentDraft & { url: string | null }
 
 /**
- * Which bucket and which `attachment_kind` an owner's photos use.
+ * Which bucket, which `attachment_kind` and which compression budget an
+ * owner's photos use.
  *
  * Three buckets exist and six things can own an attachment, so the mapping is
  * stated once here rather than guessed at each call site. Timeline notes and
  * service records are photographs of the car, so they live with the car.
+ *
+ * `role` picks the budget in `lib/images/budgets.ts`. A receipt is read once
+ * for its numbers; a progress photo is opened full-screen like an inspiration
+ * shot, so it gets the same allowance.
  */
 export const ATTACHMENT_TARGET = {
-  expense: { bucket: 'receipts', kind: 'receipt' },
-  mod_plan: { bucket: 'inspiration', kind: 'inspiration' },
-  timeline_note: { bucket: 'vehicles', kind: 'progress' },
-  service_record: { bucket: 'receipts', kind: 'receipt' },
-  fuel_log: { bucket: 'receipts', kind: 'receipt' },
-  part: { bucket: 'vehicles', kind: 'progress' },
-} as const satisfies Record<string, { bucket: StorageBucket; kind: AttachmentKind }>
+  expense: { bucket: 'receipts', kind: 'receipt', role: 'receipt' },
+  mod_plan: { bucket: 'inspiration', kind: 'inspiration', role: 'inspiration' },
+  timeline_note: { bucket: 'vehicles', kind: 'progress', role: 'inspiration' },
+  service_record: { bucket: 'receipts', kind: 'receipt', role: 'receipt' },
+  fuel_log: { bucket: 'receipts', kind: 'receipt', role: 'receipt' },
+  part: { bucket: 'vehicles', kind: 'progress', role: 'inspiration' },
+} as const satisfies Record<
+  string,
+  { bucket: StorageBucket; kind: AttachmentKind; role: ImageRole }
+>
 
 export type AttachmentOwner = keyof typeof ATTACHMENT_TARGET
 

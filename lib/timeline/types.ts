@@ -76,6 +76,7 @@ export const KIND_LABEL: Readonly<Record<TimelineKind, string>> = {
   fuel: 'Fuel',
   milestone: 'Milestone',
   note: 'Note',
+  gallery: 'Photo',
 }
 
 /**

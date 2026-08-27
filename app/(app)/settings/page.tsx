@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 
+import { StorageMeter } from '@/components/gallery/storage-meter'
+import { fetchStorageUsage } from '@/lib/queries/gallery'
 import { currentUser } from '@/lib/queries/session'
 
 export const metadata: Metadata = { title: 'Settings' }
@@ -28,7 +30,7 @@ const ROWS = [
 
 export default async function SettingsPage() {
   // The layout has already asked; this is the same answer, memoised.
-  const user = await currentUser()
+  const [user, usage] = await Promise.all([currentUser(), fetchStorageUsage()])
 
   return (
     <section className="space-y-6">
@@ -36,6 +38,10 @@ export default async function SettingsPage() {
         <p className="text-eyebrow font-display uppercase text-ink-muted">Signed in as</p>
         <p className="mt-1 break-all font-mono text-body text-ink">{user?.email}</p>
       </div>
+
+      {/* Broken down per bucket here, because "where did the gigabyte go" is
+          the question this screen gets asked. */}
+      <StorageMeter usage={usage} detailed />
 
       <nav aria-label="Settings">
         <ul className="overflow-hidden rounded-md border border-border bg-surface">
