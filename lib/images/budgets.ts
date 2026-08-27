@@ -28,8 +28,18 @@ export type ImageBudget = {
   maxEdge: number
   /** Byte ceiling, in megabytes, as `browser-image-compression` wants it. */
   maxMB: number
-  /** Why this role gets these numbers. Shown in the upload field's help text. */
-  note: string
+}
+
+/**
+ * What the upload field tells you it is about to do.
+ *
+ * Derived from the budget rather than written next to it. The hero's caption
+ * spent a release saying "1600px" while the code resized to 2560, and a caption
+ * that can disagree with the behaviour is how that stayed invisible — the
+ * numbers were right and the only thing anyone could see said otherwise.
+ */
+export function budgetNote(budget: ImageBudget): string {
+  return `Resized to ${budget.maxEdge}px and re-encoded as WebP on this device before anything is sent.`
 }
 
 export const IMAGE_BUDGETS = {
@@ -42,7 +52,6 @@ export const IMAGE_BUDGETS = {
   hero: {
     maxEdge: 2560,
     maxMB: 1.5,
-    note: 'Resized to 2560px and re-encoded as WebP on this device before anything is sent.',
   },
 
   /**
@@ -52,7 +61,6 @@ export const IMAGE_BUDGETS = {
   inspiration: {
     maxEdge: 2048,
     maxMB: 1.0,
-    note: 'Resized to 2048px and re-encoded as WebP on this device before anything is sent.',
   },
 
   /**
@@ -63,7 +71,6 @@ export const IMAGE_BUDGETS = {
   receipt: {
     maxEdge: 2000,
     maxMB: 0.6,
-    note: 'Resized to 2000px and re-encoded as WebP on this device before anything is sent.',
   },
 } as const satisfies Record<ImageRole, ImageBudget>
 

@@ -143,7 +143,7 @@ function FilterSheetBody({
 
   return (
     <>
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-4 py-4">
         <div className="grid grid-cols-2 gap-3">
           <Field label="From" htmlFor="filter-from">
             <input

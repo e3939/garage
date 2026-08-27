@@ -208,7 +208,7 @@ export function ModSheet({
 
   return (
     <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-4 py-4">
         <Field label="What is it" htmlFor="mod-title" error={formError}>
           <input
             id="mod-title"

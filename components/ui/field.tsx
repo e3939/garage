@@ -10,10 +10,18 @@ type FieldProps = {
   className?: string
 }
 
-/** Label above, control, then one line of hint or error. Forms are labelled. */
+/**
+ * Label above, control, then one line of hint or error. Forms are labelled.
+ *
+ * `min-w-0` is load-bearing. A grid or flex item's minimum width is `auto`,
+ * which means it refuses to shrink below its content's intrinsic width — and an
+ * `input` carries a default intrinsic width of roughly twenty characters
+ * whatever `w-full` says. Two fields side by side in a `grid-cols-2` therefore
+ * add up to more than a 390pt sheet, and the sheet pans sideways to show them.
+ */
 export function Field({ label, htmlFor, hint, error, children, className = '' }: FieldProps) {
   return (
-    <div className={`space-y-1 ${className}`}>
+    <div className={`min-w-0 space-y-1 ${className}`}>
       <label htmlFor={htmlFor} className="block text-label text-ink-muted">
         {label}
       </label>

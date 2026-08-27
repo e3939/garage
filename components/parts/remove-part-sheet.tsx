@@ -101,7 +101,7 @@ export function RemovePartSheet({ part, currency, locale, today, onDone }: Remov
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-4 py-4">
         <div className="space-y-2">
           <p className="text-label text-ink-muted">What happens to it</p>
           <div className="flex flex-wrap gap-2">

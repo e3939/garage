@@ -9,11 +9,13 @@ import {
   deleteGalleryPhotosAction,
   signOriginalAction,
 } from '@/app/(app)/garage/[vehicleId]/gallery/actions'
+import { PhotoViewer } from '@/components/attachments/photo-viewer'
 import { GalleryUpload } from '@/components/gallery/gallery-upload'
 import { Camera, ICON_EMPTY, ICON_UI } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { INPUT_CLASS } from '@/components/ui/field'
 import { useToast } from '@/components/ui/toast'
+import type { AttachmentView } from '@/lib/attachments/types'
 import { dateLabel } from '@/lib/dates-display'
 import {
   formatBytes,
@@ -56,8 +58,7 @@ export function GalleryScreen({
   const [albumFilter, setAlbumFilter] = useState<string | 'all' | 'loose'>('all')
   const [selection, setSelection] = useState<Set<string>>(new Set())
   const [selecting, setSelecting] = useState(false)
-  const [viewing, setViewing] = useState<GalleryPhotoView | null>(null)
-  const [viewingUrl, setViewingUrl] = useState<string | null>(null)
+  const [viewing, setViewing] = useState(-1)
   const [newAlbum, setNewAlbum] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -66,6 +67,28 @@ export function GalleryScreen({
     if (albumFilter === 'loose') return photos.filter((photo) => photo.album_id === null)
     return photos.filter((photo) => photo.album_id === albumFilter)
   }, [photos, albumFilter])
+
+  /**
+   * The viewer's own shape. Everything it needs is already on the row; the
+   * fields it does not use are filled in rather than made optional, because
+   * `AttachmentView` is the contract six other screens share.
+   */
+  const viewerPhotos: AttachmentView[] = useMemo(
+    () =>
+      visible.map((photo, position) => ({
+        id: photo.id,
+        storage_path: photo.storage_path,
+        bucket_name: 'gallery' as const,
+        kind: 'progress' as const,
+        width: photo.width,
+        height: photo.height,
+        bytes: photo.bytes,
+        caption: photo.caption,
+        sort_order: position,
+        url: photo.original_url,
+      })),
+    [visible],
+  )
 
   const selectedPhotos = photos.filter((photo) => selection.has(photo.id))
   const selectedBytes = selectedPhotos.reduce((sum, photo) => sum + photo.bytes, 0)
@@ -77,13 +100,6 @@ export function GalleryScreen({
       else next.add(id)
       return next
     })
-  }
-
-  async function open(photo: GalleryPhotoView) {
-    setViewing(photo)
-    setViewingUrl(null)
-    const url = await signOriginalAction(photo.id)
-    setViewingUrl(url)
   }
 
   /**
@@ -232,13 +248,13 @@ export function GalleryScreen({
           </div>
 
           <ul className="grid grid-cols-3 gap-2">
-            {visible.map((photo) => {
+            {visible.map((photo, position) => {
               const chosen = selection.has(photo.id)
               return (
                 <li key={photo.id}>
                   <button
                     type="button"
-                    onClick={() => (selecting ? toggle(photo.id) : void open(photo))}
+                    onClick={() => (selecting ? toggle(photo.id) : setViewing(position))}
                     aria-pressed={selecting ? chosen : undefined}
                     className={[
                       'relative block aspect-square w-full overflow-hidden rounded-sm border',
@@ -290,15 +306,44 @@ export function GalleryScreen({
         </div>
       ) : null}
 
-      {viewing ? (
-        <FullScreen
-          photo={viewing}
-          url={viewingUrl}
-          vehicleName={vehicleName}
-          onClose={() => setViewing(null)}
-          onDownload={() => void download([viewing])}
-        />
-      ) : null}
+      {/* The viewer built in Phase 4, not a second one. It is a native
+          <dialog> opened with showModal(), so it lives in the browser's top
+          layer — above the nav bar, the FAB and every stacking context on the
+          page, with a real ::backdrop behind it. The hand-rolled overlay this
+          replaces used `bg-ink/95`, and Tailwind cannot apply an opacity
+          modifier to a colour that is a bare CSS variable: the class was never
+          emitted, so the overlay had no background at all and the whole gallery
+          showed through it. */}
+      <PhotoViewer
+        photos={viewerPhotos}
+        index={viewing}
+        context={vehicleName}
+        onClose={() => setViewing(-1)}
+        action={
+          viewing >= 0 && visible[viewing] ? (
+            <button
+              type="button"
+              onClick={() => void download([visible[viewing] as GalleryPhotoView])}
+              className="viewer-chrome min-h-touch rounded-md px-4 text-label"
+            >
+              Download
+            </button>
+          ) : null
+        }
+        meta={(photo) => {
+          const source = visible.find((row) => row.id === photo.id)
+          if (!source) return null
+          return (
+            <p className="font-mono text-caption">
+              {source.original_filename} · {formatBytes(source.bytes)}
+              {source.width && source.height ? ` · ${source.width}x${source.height}` : ''}
+              {` · ${dateLabel(source.occurred_on)}`}
+              {source.album_name ? ` · ${source.album_name}` : ''}
+              {source.odometer_km !== null ? ` · ${source.odometer_km} km` : ''}
+            </p>
+          )
+        }}
+      />
     </div>
   )
 }
@@ -324,66 +369,5 @@ function FilterChip({
     >
       {children}
     </button>
-  )
-}
-
-/**
- * The original, full-screen. A plain `img`, never `next/image`: the file is the
- * point, and putting it through the optimiser would hand back a re-encoded WebP
- * of the thing the user came here to see at full size.
- */
-function FullScreen({
-  photo,
-  url,
-  vehicleName,
-  onClose,
-  onDownload,
-}: {
-  photo: GalleryPhotoView
-  url: string | null
-  vehicleName: string
-  onClose: () => void
-  onDownload: () => void
-}) {
-  return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-ink/95">
-      <div className="safe-x flex items-center justify-between gap-3 py-3">
-        <button type="button" onClick={onClose} className="min-h-touch px-2 text-label text-bg">
-          Close
-        </button>
-        <button type="button" onClick={onDownload} className="min-h-touch px-2 text-label text-bg">
-          Download
-        </button>
-      </div>
-
-      <div className="flex min-h-0 flex-1 items-center justify-center px-2">
-        {url ? (
-          /* The original, served exactly as stored: putting the file through
-             the optimiser would hand back a re-encoded WebP of the thing the
-             user opened this screen to see at full size. */
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={url}
-            alt={photo.caption ?? `Photo of ${vehicleName}`}
-            className="max-h-full max-w-full object-contain"
-          />
-        ) : (
-          <p className="text-body text-bg">Opening the original…</p>
-        )}
-      </div>
-
-      <div className="safe-x space-y-1 py-4">
-        {photo.caption ? <p className="text-body text-bg">{photo.caption}</p> : null}
-        <p className="font-mono text-caption text-bg/70">
-          {photo.original_filename} · {formatBytes(photo.bytes)}
-          {photo.width && photo.height ? ` · ${photo.width}x${photo.height}` : ''}
-        </p>
-        <p className="text-caption text-bg/70">
-          {dateLabel(photo.occurred_on)}
-          {photo.album_name ? ` · ${photo.album_name}` : ''}
-          {photo.odometer_km !== null ? ` · ${photo.odometer_km} km` : ''}
-        </p>
-      </div>
-    </div>
   )
 }

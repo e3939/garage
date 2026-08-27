@@ -2,7 +2,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { photoAlt, type AttachmentView } from '@/lib/attachments/types'
 
@@ -12,10 +12,38 @@ type PhotoViewerProps = {
   index: number
   /** Names what is in the pictures, for alt text on the ones with no caption. */
   context: string
+  /** An extra control beside Close. The gallery puts Download here. */
+  action?: ReactNode
+  /** A line under the caption: filename, size, dimensions. */
+  meta?: (photo: AttachmentView) => ReactNode
   onClose: () => void
 }
 
 const MAX_SCALE = 4
+
+/**
+ * Whether a click landed on the picture or on the dark around it.
+ *
+ * `object-contain` letterboxes, but the `img` element still fills its frame, so
+ * the event target is the image wherever you tap. The rendered picture's box
+ * has to be worked out from its natural proportions instead — and that is worth
+ * doing, because the bands above and below a 4:3 photo on a phone are most of
+ * the screen, and tapping them to dismiss is what everyone expects a
+ * full-screen photo to do.
+ */
+function tappedOutsidePicture(image: HTMLImageElement, clientX: number, clientY: number): boolean {
+  const frame = image.getBoundingClientRect()
+  const naturalRatio = image.naturalWidth / image.naturalHeight
+  if (!Number.isFinite(naturalRatio) || naturalRatio <= 0) return false
+
+  const frameRatio = frame.width / frame.height
+  const width = frameRatio > naturalRatio ? frame.height * naturalRatio : frame.width
+  const height = frameRatio > naturalRatio ? frame.height : frame.width / naturalRatio
+  const left = frame.left + (frame.width - width) / 2
+  const top = frame.top + (frame.height - height) / 2
+
+  return clientX < left || clientX > left + width || clientY < top || clientY > top + height
+}
 
 function distance(touches: TouchList): number {
   const [a, b] = [touches[0], touches[1]]
@@ -36,7 +64,14 @@ function distance(touches: TouchList): number {
  * engine bay does not fly off to the next picture. Letting go back at 1x hands
  * the swipe back.
  */
-export function PhotoViewer({ photos, index, context, onClose }: PhotoViewerProps) {
+export function PhotoViewer({
+  photos,
+  index,
+  context,
+  action,
+  meta,
+  onClose,
+}: PhotoViewerProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const track = useRef<HTMLDivElement>(null)
   const [active, setActive] = useState(Math.max(0, index))
@@ -53,6 +88,19 @@ export function PhotoViewer({ photos, index, context, onClose }: PhotoViewerProp
     if (!element) return
     if (open && !element.open) element.showModal()
     if (!open && element.open) element.close()
+  }, [open])
+
+  // A modal dialog makes the document inert, but not every engine stops it
+  // scrolling underneath — and a page that slides around behind a photo is the
+  // tell that the photo is not really full screen.
+  useEffect(() => {
+    if (!open) return
+    const root = document.documentElement
+    const previous = root.style.overflow
+    root.style.overflow = 'hidden'
+    return () => {
+      root.style.overflow = previous
+    }
   }, [open])
 
   // Opening on photo three means starting scrolled to photo three. `instant`
@@ -148,6 +196,12 @@ export function PhotoViewer({ photos, index, context, onClose }: PhotoViewerProp
         if (event.key === 'ArrowRight') step(1)
         if (event.key === 'ArrowLeft') step(-1)
       }}
+      onClick={(event) => {
+        // A click landing on the dialog element itself is a click on the
+        // backdrop: the photo and its chrome sit in the div below and stop
+        // there. Same rule the bottom sheet uses.
+        if (event.target === dialog.current) onClose()
+      }}
     >
       {open ? (
         <div className="relative size-full">
@@ -165,6 +219,13 @@ export function PhotoViewer({ photos, index, context, onClose }: PhotoViewerProp
                 onTouchMove={onTouchMove}
                 onTouchEnd={onTouchEnd}
                 onDoubleClick={toggleZoom}
+                onClick={(event) => {
+                  if (zoomed) return
+                  const image = event.currentTarget.querySelector('img')
+                  if (image && tappedOutsidePicture(image, event.clientX, event.clientY)) {
+                    onClose()
+                  }
+                }}
               >
                 {photo.url ? (
                   <div
@@ -210,22 +271,26 @@ export function PhotoViewer({ photos, index, context, onClose }: PhotoViewerProp
             <span className="viewer-chrome rounded-full px-3 py-1 font-mono text-caption">
               {active + 1} / {photos.length}
             </span>
-            <button
-              type="button"
-              onClick={onClose}
-              className="viewer-chrome pointer-events-auto min-h-touch rounded-md px-4 text-label"
-            >
-              Close
-            </button>
+            <div className="pointer-events-auto flex items-center gap-2">
+              {action}
+              <button
+                type="button"
+                onClick={onClose}
+                className="viewer-chrome min-h-touch rounded-md px-4 text-label"
+              >
+                Close
+              </button>
+            </div>
           </div>
 
-          {current?.caption ? (
-            <p
-              className="viewer-chrome absolute inset-x-0 bottom-0 px-4 py-3 text-body"
+          {current && (current.caption || meta) ? (
+            <div
+              className="viewer-chrome absolute inset-x-0 bottom-0 space-y-1 px-4 py-3"
               style={{ paddingBottom: 'calc(var(--space-3) + env(safe-area-inset-bottom))' }}
             >
-              {current.caption}
-            </p>
+              {current.caption ? <p className="text-body">{current.caption}</p> : null}
+              {meta ? meta(current) : null}
+            </div>
           ) : null}
         </div>
       ) : null}

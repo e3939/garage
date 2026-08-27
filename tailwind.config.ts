@@ -1,6 +1,33 @@
 import type { Config } from 'tailwindcss'
 
 /**
+ * A design token that can still take an opacity modifier.
+ *
+ * Tailwind can only apply `/95` to a colour it is able to decompose into
+ * channels, and every colour in this file is a bare `var(--x)`. Given one of
+ * those it does not warn, and it does not fall back — it simply declines to
+ * emit the class. `bg-bg/95` on the app header was therefore not a rule at all,
+ * which is why the sticky header had no background and the page scrolled
+ * visibly through the title.
+ *
+ * `color-mix` keeps the value a CSS variable while letting the alpha through.
+ * The `calc` form matters: Tailwind passes a literal like `0.95` for `/95` and
+ * a `var(--tw-bg-opacity)` for the older `bg-opacity-*` utilities, and `calc`
+ * is what accepts both.
+ */
+function token(name: string): string {
+  const resolve = ({ opacityValue }: { opacityValue?: string }) =>
+    opacityValue === undefined
+      ? `var(${name})`
+      : `color-mix(in srgb, var(${name}) calc(${opacityValue} * 100%), transparent)`
+
+  // Tailwind has accepted a function per colour since v3 and resolves it while
+  // generating utilities, but its published types only describe the string
+  // form. One cast, here, rather than one at each of the twenty-two colours.
+  return resolve as unknown as string
+}
+
+/**
  * Every value below points at a CSS custom property defined in app/globals.css.
  * Nothing is written twice, and nothing arbitrary gets in: the spacing, radius
  * and type scales are replaced rather than extended, so `p-7` or `rounded-3xl`
@@ -21,35 +48,35 @@ const config: Config = {
       // Source palette. Reach for the semantic name below unless you are
       // deliberately naming the ink itself.
       fire: {
-        green: 'var(--fire-green)',
-        cream: 'var(--fire-cream)',
-        amber: 'var(--fire-amber)',
-        brick: 'var(--fire-brick)',
-        ember: 'var(--fire-ember)',
+        green: token('--fire-green'),
+        cream: token('--fire-cream'),
+        amber: token('--fire-amber'),
+        brick: token('--fire-brick'),
+        ember: token('--fire-ember'),
       },
 
       // Semantic surfaces and ink.
-      bg: 'var(--bg)',
-      surface: 'var(--surface)',
-      'surface-sunken': 'var(--surface-sunken)',
-      border: 'var(--border)',
-      'border-strong': 'var(--border-strong)',
-      ink: 'var(--text)',
-      'ink-muted': 'var(--text-muted)',
-      'ink-faint': 'var(--text-faint)',
+      bg: token('--bg'),
+      surface: token('--surface'),
+      'surface-sunken': token('--surface-sunken'),
+      border: token('--border'),
+      'border-strong': token('--border-strong'),
+      ink: token('--text'),
+      'ink-muted': token('--text-muted'),
+      'ink-faint': token('--text-faint'),
 
       // Semantic states.
-      accent: 'var(--accent)',
-      'accent-ink': 'var(--accent-ink)',
-      positive: 'var(--positive)',
-      attention: 'var(--attention)',
-      critical: 'var(--critical)',
-      highlight: 'var(--highlight)',
+      accent: token('--accent'),
+      'accent-ink': token('--accent-ink'),
+      positive: token('--positive'),
+      attention: token('--attention'),
+      critical: token('--critical'),
+      highlight: token('--highlight'),
 
       // Buckets. Consistent everywhere; this is the app's core vocabulary.
-      'bucket-life': 'var(--bucket-life)',
-      'bucket-car-running': 'var(--bucket-car-running)',
-      'bucket-car-project': 'var(--bucket-car-project)',
+      'bucket-life': token('--bucket-life'),
+      'bucket-car-running': token('--bucket-car-running'),
+      'bucket-car-project': token('--bucket-car-project'),
     },
 
     spacing: {

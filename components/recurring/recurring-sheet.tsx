@@ -176,7 +176,7 @@ export function RecurringSheet({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-4 py-4">
         <Field label="What it is" htmlFor="recurring-label" error={error}>
           <input
             id="recurring-label"

@@ -19,10 +19,12 @@ const PHOTO_COLUMNS =
 /**
  * Every photo for a vehicle, newest first, with thumbnail URLs.
  *
- * Thumbnails only. The original is megabytes and is signed one at a time, when
- * something actually asks to open or download it — signing a page of forty
- * originals to render a grid would be the whole point of the thumbnail thrown
- * away.
+ * Both the thumbnail and the original are signed here. Signing looks expensive
+ * and is not: `signedUrls` batches a whole bucket into one request, so a page
+ * of forty photos costs two round trips in total, not eighty. A signed URL is
+ * only a string — nothing is fetched until an `img` asks for it — and having
+ * the original ready is what lets the viewer swipe between photos instead of
+ * waiting on a round trip per swipe.
  */
 export async function fetchGalleryPhotos(vehicleId: string): Promise<GalleryPhotoView[]> {
   const supabase = await createClient()
@@ -43,15 +45,21 @@ export async function fetchGalleryPhotos(vehicleId: string): Promise<GalleryPhot
     return { ...rest, album_name: gallery_albums?.name ?? null } as GalleryPhoto
   })
 
-  const thumbs = await signedUrls(
-    GALLERY_BUCKET,
-    rows.map((row) => row.thumb_path),
-  )
+  const [thumbs, originals] = await Promise.all([
+    signedUrls(
+      GALLERY_BUCKET,
+      rows.map((row) => row.thumb_path),
+    ),
+    signedUrls(
+      GALLERY_BUCKET,
+      rows.map((row) => row.storage_path),
+    ),
+  ])
 
   return rows.map((row, index) => ({
     ...row,
     thumb_url: thumbs[index] ?? null,
-    original_url: null,
+    original_url: originals[index] ?? null,
   }))
 }
 

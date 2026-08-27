@@ -30,6 +30,32 @@ export function Sheet({ open, onClose, title, action, children }: SheetProps) {
     if (!open && dialog.open) dialog.close()
   }, [open])
 
+  /**
+   * Lock the page behind the sheet.
+   *
+   * `showModal()` makes the document inert, which stops it being clicked but
+   * not reliably scrolled. That was invisible until a sheet opened over the mod
+   * board, which is a horizontally snapping carousel five columns wide: the
+   * board panned sideways underneath, and because the sheet is fixed to a
+   * viewport that moves with it on iOS, the whole sheet appeared to slide and
+   * its fields ran off the right edge. The sheet was never too wide.
+   *
+   * Both axes, because the vertical case is the same bug with less to notice:
+   * the page scrolling away behind a form is how a sheet stops reading as a
+   * sheet.
+   */
+  useEffect(() => {
+    if (!open) return
+    const root = document.documentElement
+    const previous = { overflow: root.style.overflow, overscroll: root.style.overscrollBehavior }
+    root.style.overflow = 'hidden'
+    root.style.overscrollBehavior = 'none'
+    return () => {
+      root.style.overflow = previous.overflow
+      root.style.overscrollBehavior = previous.overscroll
+    }
+  }, [open])
+
   return (
     <dialog
       ref={ref}

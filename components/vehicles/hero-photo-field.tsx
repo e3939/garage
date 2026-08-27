@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { discardVehiclePhotoAction } from '@/app/(app)/garage/actions'
 import { Button } from '@/components/ui/button'
-import { IMAGE_BUDGETS, MAX_INPUT_BYTES } from '@/lib/images/budgets'
+import { IMAGE_BUDGETS, MAX_INPUT_BYTES, budgetNote } from '@/lib/images/budgets'
 
 /** docs/02-DATA-MODEL.md: object paths are {user_id}/{vehicle_id}/{uuid}.webp. */
 const BUCKET = 'vehicles'
@@ -233,8 +233,7 @@ export function HeroPhotoField({
       />
 
       <p className="text-caption text-ink-muted" aria-live="polite">
-        {message ??
-          'Resized to 1600px and re-encoded as WebP on this device before anything is sent.'}
+        {message ?? budgetNote(BUDGET)}
       </p>
     </div>
   )

@@ -72,7 +72,7 @@ export function ContributeSheet({ fund, locale, today, onDone }: ContributeSheet
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden px-4 py-4">
         <div role="group" aria-label="Direction" className="panel-sunken flex w-full gap-1 rounded-full p-1">
           {[
             { key: false, label: 'Put in' },

@@ -8,7 +8,7 @@ import { discardUploadAction } from '@/app/(app)/attachments/actions'
 import { Button } from '@/components/ui/button'
 import { INPUT_CLASS } from '@/components/ui/field'
 import { Thumbnail } from '@/components/attachments/thumbnail'
-import { IMAGE_BUDGETS, MAX_INPUT_BYTES } from '@/lib/images/budgets'
+import { IMAGE_BUDGETS, MAX_INPUT_BYTES, budgetNote } from '@/lib/images/budgets'
 import {
   ATTACHMENT_TARGET,
   uploadPath,
@@ -411,8 +411,7 @@ export function AttachmentField({
       />
 
       <p className="text-caption text-ink-muted">
-        {error ??
-          budget.note}
+        {error ?? budgetNote(budget)}
       </p>
     </div>
   )
