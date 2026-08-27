@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 
 import { createModAction, updateModAction } from '@/app/(app)/mods/actions'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
@@ -130,7 +131,7 @@ export function ModSheet({
     return map
   }, [initial])
 
-  const { register, handleSubmit, watch } = useForm<Values>({
+  const { register, handleSubmit, setValue, watch } = useForm<Values>({
     defaultValues: defaults(initial, currency, locale),
   })
 
@@ -258,13 +259,13 @@ export function ModSheet({
             htmlFor="mod-min"
             hint={parsedAmountHint(values.minText, currency, locale) ?? 'Low end'}
           >
-            <input
+            <AmountInput
               id="mod-min"
-              inputMode="decimal"
-              autoComplete="off"
               placeholder="0"
-              className={`${INPUT_CLASS} font-mono`}
-              {...register('minText')}
+              currency={currency}
+              locale={locale}
+              value={values.minText}
+              onValueChange={(text) => setValue('minText', text, { shouldDirty: true })}
             />
           </Field>
           <Field
@@ -272,13 +273,13 @@ export function ModSheet({
             htmlFor="mod-max"
             hint={parsedAmountHint(values.maxText, currency, locale) ?? 'High end'}
           >
-            <input
+            <AmountInput
               id="mod-max"
-              inputMode="decimal"
-              autoComplete="off"
               placeholder="0"
-              className={`${INPUT_CLASS} font-mono`}
-              {...register('maxText')}
+              currency={currency}
+              locale={locale}
+              value={values.maxText}
+              onValueChange={(text) => setValue('maxText', text, { shouldDirty: true })}
             />
           </Field>
         </div>

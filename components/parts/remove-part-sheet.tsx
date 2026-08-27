@@ -4,6 +4,7 @@
 import { useState } from 'react'
 
 import { removePartAction, undoPartRemovalAction } from '@/app/(app)/parts/actions'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
@@ -137,14 +138,14 @@ export function RemovePartSheet({ part, currency, locale, today, onDone }: Remov
               hint={parsedAmountHint(amountText, currency, locale) ?? 'Type 150k or 1.2m if that is quicker.'}
               error={formError}
             >
-              <input
+              <AmountInput
                 id="removal-amount"
-                inputMode="decimal"
-                autoComplete="off"
                 placeholder="0"
                 className={`${INPUT_CLASS} font-mono text-odometer`}
+                currency={currency}
+                locale={locale}
                 value={amountText}
-                onChange={(event) => setAmountText(event.target.value)}
+                onValueChange={setAmountText}
               />
             </Field>
 

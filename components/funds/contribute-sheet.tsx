@@ -4,6 +4,7 @@
 import { useState } from 'react'
 
 import { logContributionAction } from '@/app/(app)/funds/actions'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Button } from '@/components/ui/button'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
 import { Money } from '@/components/ui/money'
@@ -101,15 +102,15 @@ export function ContributeSheet({ fund, locale, today, onDone }: ContributeSheet
           hint={parsedAmountHint(amountText, fund.currency, locale) ?? 'What moved.'}
           error={error}
         >
-          <input
+          <AmountInput
             id="contribution-amount"
-            inputMode="decimal"
-            autoComplete="off"
             autoFocus
             placeholder="0"
             className={`${INPUT_CLASS} font-mono text-odometer-lg`}
+            currency={fund.currency}
+            locale={locale}
             value={amountText}
-            onChange={(event) => setAmountText(event.target.value)}
+            onValueChange={setAmountText}
           />
         </Field>
 

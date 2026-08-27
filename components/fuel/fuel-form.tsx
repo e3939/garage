@@ -11,6 +11,7 @@ import {
   updateFuelLogAction,
 } from '@/app/(app)/fuel/actions'
 import { LinkedExpenseField } from '@/components/expenses/linked-expense-field'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Button } from '@/components/ui/button'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
 import { Money } from '@/components/ui/money'
@@ -114,7 +115,7 @@ export function FuelForm({
     () => defaultCategory(categories, 'Fuel', 'car_running')?.id ?? '',
   )
 
-  const { register, handleSubmit, watch } = useForm<Values>({
+  const { register, handleSubmit, setValue, watch } = useForm<Values>({
     defaultValues: {
       filledOn: initial?.filled_on ?? today,
       odometerKm: String(initial?.odometer_km ?? lastReading),
@@ -249,13 +250,13 @@ export function FuelForm({
             />
           </Field>
           <Field label="Total cost" htmlFor="fuel-cost">
-            <input
+            <AmountInput
               id="fuel-cost"
-              inputMode="decimal"
-              autoComplete="off"
               placeholder="920k"
-              className={`${INPUT_CLASS} font-mono`}
-              {...register('costText')}
+              currency={currency}
+              locale={locale}
+              value={values.costText}
+              onValueChange={(text) => setValue('costText', text, { shouldDirty: true })}
             />
           </Field>
         </div>

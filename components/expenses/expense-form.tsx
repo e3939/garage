@@ -21,6 +21,7 @@ import {
 import { CategoryChips } from '@/components/expenses/category-chips'
 import { ImpactControl } from '@/components/expenses/impact-control'
 import { useExpenseStore } from '@/components/expenses/expense-store'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Button } from '@/components/ui/button'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
 import { Money } from '@/components/ui/money'
@@ -430,15 +431,20 @@ export function ExpenseForm({
           hint={hint ?? 'Type 150k or 1.2m if that is quicker.'}
           error={formError}
         >
-          <input
+          <AmountInput
             id="expense-amount"
-            inputMode="decimal"
-            autoComplete="off"
             enterKeyHint="done"
             placeholder="0"
             className={`${INPUT_CLASS} font-mono text-odometer-lg`}
-            {...amountField}
-            ref={(element) => {
+            currency={currency}
+            locale={locale}
+            value={values.amountText}
+            onValueChange={(text) =>
+              setValue('amountText', text, { shouldDirty: true, shouldValidate: true })
+            }
+            onBlur={amountField.onBlur}
+            name={amountField.name}
+            inputRef={(element) => {
               amountField.ref(element)
               amountRef.current = element
             }}

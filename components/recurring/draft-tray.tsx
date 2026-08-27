@@ -4,8 +4,8 @@
 import { useState } from 'react'
 
 import { confirmDraftAction, discardDraftAction } from '@/app/(app)/recurring/actions'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Button } from '@/components/ui/button'
-import { INPUT_CLASS } from '@/components/ui/field'
 import { useToast } from '@/components/ui/toast'
 import { undoFor } from '@/components/ui/undo'
 import { formatAmount, parseAmount, parsedAmountHint } from '@/lib/money'
@@ -109,14 +109,13 @@ export function DraftTray({ drafts, locale, dateLabels }: DraftTrayProps) {
               </div>
 
               <div className="flex items-center gap-2">
-                <input
-                  inputMode="decimal"
-                  autoComplete="off"
+                <AmountInput
                   aria-label={`Amount for ${name}`}
-                  className={`${INPUT_CLASS} font-mono`}
+                  currency={draft.currency}
+                  locale={locale}
                   value={text}
-                  onChange={(event) =>
-                    setAmounts((previous) => ({ ...previous, [draft.id]: event.target.value }))
+                  onValueChange={(next) =>
+                    setAmounts((previous) => ({ ...previous, [draft.id]: next }))
                   }
                 />
                 <Button

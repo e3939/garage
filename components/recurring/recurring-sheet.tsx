@@ -9,6 +9,7 @@ import {
   updateRecurringAction,
 } from '@/app/(app)/recurring/actions'
 import { CategoryChips } from '@/components/expenses/category-chips'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Button } from '@/components/ui/button'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
 import { useToast } from '@/components/ui/toast'
@@ -195,14 +196,13 @@ export function RecurringSheet({
             'The draft arrives at this figure and the amount is editable before you confirm it.'
           }
         >
-          <input
+          <AmountInput
             id="recurring-amount"
-            inputMode="decimal"
-            autoComplete="off"
             placeholder="0"
-            className={`${INPUT_CLASS} font-mono`}
+            currency={currency}
+            locale={locale}
             value={amountText}
-            onChange={(event) => setAmountText(event.target.value)}
+            onValueChange={setAmountText}
           />
         </Field>
 

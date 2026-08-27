@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 
+import { AmountInput } from '@/components/ui/amount-input'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
@@ -236,14 +237,14 @@ function FilterSheetBody({
             htmlFor="filter-min"
             hint={parsedAmountHint(minText, currency, locale) ?? undefined}
           >
-            <input
+            <AmountInput
               id="filter-min"
-              inputMode="decimal"
-              className={`${INPUT_CLASS} font-mono`}
+              currency={currency}
+              locale={locale}
               value={minText}
-              onChange={(event) => {
-                setMinText(event.target.value)
-                patch({ amountMin: parseAmount(event.target.value, currency) })
+              onValueChange={(text) => {
+                setMinText(text)
+                patch({ amountMin: parseAmount(text, currency) })
               }}
             />
           </Field>
@@ -252,14 +253,14 @@ function FilterSheetBody({
             htmlFor="filter-max"
             hint={parsedAmountHint(maxText, currency, locale) ?? undefined}
           >
-            <input
+            <AmountInput
               id="filter-max"
-              inputMode="decimal"
-              className={`${INPUT_CLASS} font-mono`}
+              currency={currency}
+              locale={locale}
               value={maxText}
-              onChange={(event) => {
-                setMaxText(event.target.value)
-                patch({ amountMax: parseAmount(event.target.value, currency) })
+              onValueChange={(text) => {
+                setMaxText(text)
+                patch({ amountMax: parseAmount(text, currency) })
               }}
             />
           </Field>

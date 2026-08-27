@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form'
 
 import { createVehicleAction, updateVehicleAction } from '@/app/(app)/garage/actions'
 import { HeroPhotoField } from '@/components/vehicles/hero-photo-field'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Button } from '@/components/ui/button'
 import { ColourPicker } from '@/components/ui/colour-picker'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
@@ -314,13 +315,15 @@ export function VehicleForm({
           htmlFor="vehicle-purchase-price"
           hint={priceHint ?? 'Type 620m if that is quicker.'}
         >
-          <input
+          <AmountInput
             id="vehicle-purchase-price"
-            inputMode="decimal"
-            autoComplete="off"
-            className={`${INPUT_CLASS} font-mono`}
             placeholder="0"
-            {...register('purchasePriceText')}
+            currency={currency}
+            locale={locale}
+            value={values.purchasePriceText}
+            onValueChange={(text) =>
+              setValue('purchasePriceText', text, { shouldDirty: true })
+            }
           />
         </Field>
       </div>

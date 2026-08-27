@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation'
 import type { Route } from 'next'
 
 import { sellVehicleAction, unsellVehicleAction } from '@/app/(app)/garage/actions'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Button } from '@/components/ui/button'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
 import { useToast } from '@/components/ui/toast'
@@ -148,13 +149,12 @@ export function SellVehicle({
             htmlFor="sold-price"
             hint={priceHint ?? 'Leave it blank if you would rather not record one.'}
           >
-            <input
+            <AmountInput
               id="sold-price"
-              inputMode="decimal"
-              autoComplete="off"
-              className={`${INPUT_CLASS} font-mono`}
+              currency={currency}
+              locale={locale}
               value={priceText}
-              onChange={(event) => setPriceText(event.target.value)}
+              onValueChange={setPriceText}
             />
           </Field>
 

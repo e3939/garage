@@ -9,6 +9,7 @@ import {
   setFundClosedAction,
   updateFundAction,
 } from '@/app/(app)/funds/actions'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Button } from '@/components/ui/button'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
 import { Money } from '@/components/ui/money'
@@ -185,14 +186,13 @@ export function FundSheet({
           htmlFor="fund-target"
           hint={parsedAmountHint(targetText, currency, locale) ?? 'What it will cost.'}
         >
-          <input
+          <AmountInput
             id="fund-target"
-            inputMode="decimal"
-            autoComplete="off"
             placeholder="0"
-            className={`${INPUT_CLASS} font-mono`}
+            currency={currency}
+            locale={locale}
             value={targetText}
-            onChange={(event) => setTargetText(event.target.value)}
+            onValueChange={setTargetText}
           />
         </Field>
 
@@ -204,14 +204,13 @@ export function FundSheet({
             'Optional. Without it there is no projected date.'
           }
         >
-          <input
+          <AmountInput
             id="fund-rate"
-            inputMode="decimal"
-            autoComplete="off"
             placeholder="0"
-            className={`${INPUT_CLASS} font-mono`}
+            currency={currency}
+            locale={locale}
             value={rateText}
-            onChange={(event) => setRateText(event.target.value)}
+            onValueChange={setRateText}
           />
         </Field>
 

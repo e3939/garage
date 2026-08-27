@@ -2,7 +2,8 @@
 'use client'
 
 import { CategoryChips } from '@/components/expenses/category-chips'
-import { Field, INPUT_CLASS } from '@/components/ui/field'
+import { AmountInput } from '@/components/ui/amount-input'
+import { Field } from '@/components/ui/field'
 import { resolveBucket, resolveCountsTowardBudget } from '@/lib/budget'
 import { monthName } from '@/lib/dates-display'
 import type { IsoDate } from '@/lib/dates'
@@ -91,14 +92,13 @@ export function LinkedExpenseField({
               htmlFor="linked-amount"
               hint={parsedAmountHint(amountText, currency, locale) ?? 'Type 150k or 1.2m if that is quicker.'}
             >
-              <input
+              <AmountInput
                 id="linked-amount"
-                inputMode="decimal"
-                autoComplete="off"
                 placeholder="0"
-                className={`${INPUT_CLASS} font-mono`}
+                currency={currency}
+                locale={locale}
                 value={amountText}
-                onChange={(event) => onAmountText(event.target.value)}
+                onValueChange={onAmountText}
               />
             </Field>
           )}

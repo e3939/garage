@@ -213,6 +213,191 @@ export function formatAmount(
 }
 
 // ---------------------------------------------------------------------------
+// Live formatting for the amount field
+//
+// The field groups thousands as you type, using the same separator
+// `formatMoney` uses, so the number in the input and the number in the ledger
+// agree character for character. This is a display change only: `parseAmount`
+// below is untouched and its ambiguity rules still decide what a string means.
+// ---------------------------------------------------------------------------
+
+/**
+ * The group and decimal characters this currency and locale actually use.
+ *
+ * Taken from `Intl` rather than hardcoded, for the same reason the exponent is:
+ * vi-VN groups with a dot and points with a comma, en-US does the reverse, and
+ * fr-FR groups with a narrow no-break space.
+ */
+export function amountSeparators(
+  currency: CurrencyCode = DEFAULT_CURRENCY,
+  locale = DEFAULT_LOCALE,
+): { group: string; decimal: string } {
+  const exponent = currencyExponent(currency)
+
+  const grouped = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: exponent,
+    maximumFractionDigits: exponent,
+    useGrouping: true,
+  }).formatToParts(1111111)
+
+  // A zero-decimal currency never prints a decimal part, so the decimal
+  // character has to come from a formatter that does.
+  const pointed = new Intl.NumberFormat(locale, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).formatToParts(1.1)
+
+  return {
+    group: grouped.find((part) => part.type === 'group')?.value ?? ',',
+    decimal: pointed.find((part) => part.type === 'decimal')?.value ?? '.',
+  }
+}
+
+/** `1234567` -> `1.234.567`, from the right, in threes. */
+function groupDigits(digits: string, group: string): string {
+  if (digits.length <= 3) return digits
+  let out = ''
+  for (let index = digits.length; index > 0; index -= 3) {
+    const start = Math.max(0, index - 3)
+    out = digits.slice(start, index) + (out ? group + out : '')
+  }
+  return out
+}
+
+/**
+ * What the amount field should show for what has been typed.
+ *
+ * The rules exist because of how people actually type, and they deliberately
+ * mirror `parseAmount` below rather than inventing a second opinion — what the
+ * field shows and what the parser reads have to agree.
+ *
+ * **A shorthand suffix stops it dead.** `150k` and `1.2m` are left exactly as
+ * typed. Grouping them would insert separators the parser would then have to
+ * read as grouping, and the dot in `1.2m` is a decimal point.
+ *
+ * **The last separator decides.** Exactly three digits after it is grouping, so
+ * `150.000` regroups to `150.000` and `24.000.000` survives a round trip.
+ * Anything else is a decimal point, so `1.2` keeps its dot and stays `1.2` —
+ * which is what makes `1.2m` reachable at all, because the `m` does not exist
+ * yet while the dot is being typed. That is the same test `parseAmount` applies
+ * to the same string.
+ *
+ * **Only digits left of that point are grouped.** The separator and everything
+ * after it are passed through untouched, so nothing anyone types is destroyed:
+ * the only characters this function adds or removes are group separators in
+ * grouping positions.
+ *
+ * **Leading zeros go.** `0150` becomes `150`, and `0000` becomes `0` rather
+ * than `0.000`, which the parser rejects — a grouped value whose first group is
+ * a zero is exactly how `0.005` is kept from reading as five.
+ */
+export function formatAmountInput(
+  raw: string,
+  currency: CurrencyCode = DEFAULT_CURRENCY,
+  locale = DEFAULT_LOCALE,
+): string {
+  if (raw === '') return ''
+  if (/[kmb]/i.test(raw)) return raw
+
+  const { group, decimal } = amountSeparators(currency, locale)
+
+  const shape = /^([+-]?)([0-9.,\u00a0\u202f ]*)([\s\S]*)$/.exec(raw)
+  if (!shape) return raw
+  const [, sign = '', numeric = '', trailing = ''] = shape
+
+  const separatorPositions: number[] = []
+  for (let index = 0; index < numeric.length; index += 1) {
+    const character = numeric[index] as string
+    if (character < '0' || character > '9') separatorPositions.push(index)
+  }
+
+  let wholePart = numeric
+  let fractionPart = ''
+
+  if (separatorPositions.length > 0) {
+    const last = separatorPositions[separatorPositions.length - 1] as number
+    const character = numeric[last] as string
+    const head = numeric.slice(0, last)
+    const tail = numeric.slice(last + 1)
+
+    // Whether the last separator is a decimal point or a group marker, decided
+    // the same way twice over:
+    //
+    //   It is the locale's decimal character. `1,234.56` in en-US, and nothing
+    //   more needs asking.
+    //
+    //   Or it is the group character but the string has the shape of a
+    //   shorthand mantissa: one separator, a short whole part, one or two
+    //   digits after it. That is `1.2` on its way to `1.2m`, in a locale where
+    //   the dot is also how thousands are marked. Without this the dot is eaten
+    //   as stray grouping and `1.2m` arrives at the parser as `12m`.
+    //
+    // Everything else is grouping, which is what keeps `2.400` regrouping to
+    // `24.000` when another digit is typed onto the end of it.
+    const isDecimalCharacter = character === decimal
+    const isShorthandMantissa =
+      separatorPositions.length === 1 &&
+      /^[0-9]{1,3}$/.test(head) &&
+      /^[0-9]{1,2}$/.test(tail)
+
+    if (isDecimalCharacter || isShorthandMantissa || tail === '') {
+      wholePart = head
+      fractionPart = numeric.slice(last)
+    }
+  }
+
+  const digits = wholePart.replace(/[^0-9]/g, '')
+  if (digits === '') return sign + fractionPart + trailing
+
+  const trimmed = digits.replace(/^0+(?=\d)/, '')
+  return sign + groupDigits(trimmed, group) + fractionPart + trailing
+}
+
+/** Digits in a string, which is the only thing a caret should be measured in. */
+function countDigits(text: string): number {
+  let count = 0
+  for (const character of text) if (character >= '0' && character <= '9') count += 1
+  return count
+}
+
+/**
+ * Where the caret goes after the field reformats.
+ *
+ * By digit count, never by character index. Inserting a separator shifts
+ * everything to its right, so an index that was correct before the edit points
+ * somewhere else after it -- which is why naive implementations of this send
+ * the caret to the end and make the middle of a number impossible to edit.
+ *
+ * Counting digits is stable across any number of separators appearing or
+ * disappearing: "three digits to my left" means the same thing before and
+ * after.
+ */
+export function amountCaret(previous: string, caret: number, next: string): number {
+  // Nothing was rewritten, so the browser already has the caret where the user
+  // put it. Digit counting would drag it back off a trailing decimal point,
+  // which is exactly where it belongs while `1.` is on its way to `1.2m`.
+  if (previous === next) return Math.min(Math.max(0, caret), next.length)
+
+  const target = countDigits(previous.slice(0, Math.max(0, caret)))
+  if (target === 0) {
+    // Before any digit: sit after a sign if there is one, otherwise at the very
+    // start. Landing after a group separator would be a caret you cannot type
+    // through.
+    return /^[+-]/.test(next) ? 1 : 0
+  }
+
+  let seen = 0
+  for (let index = 0; index < next.length; index += 1) {
+    const character = next[index] as string
+    if (character >= '0' && character <= '9') {
+      seen += 1
+      if (seen === target) return index + 1
+    }
+  }
+  return next.length
+}
+
+// ---------------------------------------------------------------------------
 // Parsing
 //
 // The amount field accepts what someone would actually type on a phone:

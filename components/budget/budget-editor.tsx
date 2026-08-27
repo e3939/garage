@@ -4,6 +4,7 @@
 import { useState, type ReactNode } from 'react'
 
 import { copyBudgetsAction, saveBudgetsAction } from '@/app/(app)/money/actions'
+import { AmountInput } from '@/components/ui/amount-input'
 import { Button } from '@/components/ui/button'
 import { Field, INPUT_CLASS } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
@@ -148,14 +149,13 @@ export function BudgetEditor({
               }
               error={error}
             >
-              <input
+              <AmountInput
                 id="budget-overall"
-                inputMode="decimal"
-                autoComplete="off"
                 placeholder="0"
-                className={`${INPUT_CLASS} font-mono`}
+                currency={currency}
+                locale={locale}
                 value={overallText}
-                onChange={(event) => setOverallText(event.target.value)}
+                onValueChange={setOverallText}
               />
             </Field>
 
@@ -185,19 +185,16 @@ export function BudgetEditor({
                         >
                           {category.name}
                         </label>
-                        <input
+                        <AmountInput
                           id={`cap-${category.id}`}
-                          inputMode="decimal"
-                          autoComplete="off"
                           placeholder="No cap"
                           aria-label={`Cap on ${category.name}`}
                           className={`${INPUT_CLASS} w-amount shrink-0 text-right font-mono`}
+                          currency={currency}
+                          locale={locale}
                           value={text}
-                          onChange={(event) =>
-                            setCapText((previous) => ({
-                              ...previous,
-                              [category.id]: event.target.value,
-                            }))
+                          onValueChange={(next) =>
+                            setCapText((previous) => ({ ...previous, [category.id]: next }))
                           }
                         />
                       </div>
