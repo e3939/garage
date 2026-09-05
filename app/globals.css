@@ -295,6 +295,30 @@
     opacity: 0.68;
   }
 
+  /* ---------------------------------------------------------------------
+     Date inputs, which iOS sizes for itself.
+
+     Safari on iOS gives `input[type=date]` an intrinsic width from the value it
+     is showing and will not go under it — `w-full` and `min-width: 0` both lose
+     that argument, which is why the field ran off the right of the quick-add
+     sheet while measuring clean on a desktop. Resetting the appearance is what
+     hands the sizing back to CSS.
+
+     The value itself is a shadow element with its own margins; without the
+     second rule it stays centred and can still push past the box.
+     --------------------------------------------------------------------- */
+  input[type='date'] {
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  input[type='date']::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+  }
+
   /* Every number in the app is mono and tabular. */
   code,
   kbd,

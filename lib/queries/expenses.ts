@@ -48,6 +48,7 @@ export async function fetchLedgerPage(
     p_amount_min: filters.amountMin ?? undefined,
     p_amount_max: filters.amountMax ?? undefined,
     p_search: filters.search || undefined,
+    p_counts_toward_budget: filters.countsTowardBudget ?? undefined,
   })
 
   if (error) throw new Error(`ledger_page failed: ${error.message}`)

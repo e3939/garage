@@ -32,6 +32,9 @@ describe('parseFilters', () => {
     })
 
     expect(filters).toEqual({
+      // The URL carries no budget filter: it is the view switcher's, not the
+      // ledger filter bar's. See filtersForView.
+      countsTowardBudget: null,
       from: '2026-08-01',
       to: '2026-08-31',
       categoryIds: [UUID_A, UUID_B],
@@ -63,6 +66,7 @@ describe('parseFilters', () => {
 
   it('round-trips through the query string', () => {
     const filters: LedgerFilters = {
+      countsTowardBudget: null,
       from: '2026-01-01',
       to: null,
       categoryIds: [UUID_A],

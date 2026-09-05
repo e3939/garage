@@ -24,11 +24,17 @@ export type LedgerFilters = {
   amountMin: number | null
   amountMax: number | null
   search: string
+  /**
+   * null: do not care. true: only rows that affect the budget, which is what
+   * the Monthly view means. `ledger_page` gained the parameter in 0023.
+   */
+  countsTowardBudget: boolean | null
 }
 
 import type { SpendView } from '@/lib/views'
 
 export const EMPTY_FILTERS: LedgerFilters = {
+  countsTowardBudget: null,
   from: null,
   to: null,
   categoryIds: [],
@@ -51,14 +57,15 @@ export const EMPTY_FILTERS: LedgerFilters = {
  * `car_only` is every bucket beginning `car_`, ignoring the budget switch,
  * which is what that view means. `all_in` is everything, so it filters nothing.
  *
- * `monthly` cannot be expressed here: it means `counts_toward_budget = true`,
- * and `ledger_page` takes no such parameter — adding one is a migration. The
- * monthly list therefore still shows rows that are kept out of the budget. The
- * figure above it is right either way, because that comes from `v_month_totals`.
+ * `monthly` is `counts_toward_budget = true`, which `ledger_page` gained a
+ * parameter for in migration 0023.
  */
 export function filtersForView(view: SpendView): LedgerFilters {
   if (view === 'car_only') {
     return { ...EMPTY_FILTERS, buckets: ['car_running', 'car_project'] }
+  }
+  if (view === 'monthly') {
+    return { ...EMPTY_FILTERS, countsTowardBudget: true }
   }
   return EMPTY_FILTERS
 }
@@ -99,6 +106,9 @@ export function parseFilters(params: RawSearchParams): LedgerFilters {
   const photo = first(params.photo)
 
   return {
+    // Not read from the URL: it is set by the view switcher on /today, which
+    // carries its own `view` param, not by the ledger's own filter bar.
+    countsTowardBudget: null,
     from: isoOrNull(first(params.from)),
     to: isoOrNull(first(params.to)),
     categoryIds: list(params.cat).filter((id) => UUID.test(id)),

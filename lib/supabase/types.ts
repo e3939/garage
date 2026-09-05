@@ -2275,6 +2275,7 @@ export type Database = {
           p_amount_min?: number
           p_buckets?: Database["public"]["Enums"]["expense_bucket"][]
           p_category_ids?: string[]
+          p_counts_toward_budget?: boolean
           p_cursor_created_at?: string
           p_cursor_id?: string
           p_cursor_occurred_on?: string
