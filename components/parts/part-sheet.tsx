@@ -20,7 +20,6 @@ import type { CategoryOption } from '@/lib/expenses/types'
 import { parseAmount } from '@/lib/money'
 import type { PartWrite } from '@/lib/parts/schema'
 import type { ExpenseOption, ModOption, Part } from '@/lib/parts/types'
-import type { ReactNode } from 'react'
 
 const AttachmentField = dynamic(
   () => import('@/components/attachments/attachment-field').then((module) => module.AttachmentField),
@@ -45,7 +44,6 @@ export type PartSheetProps = {
   expenses: readonly ExpenseOption[]
   mods: readonly ModOption[]
   categories: readonly CategoryOption[]
-  icons: Record<string, ReactNode>
   currency: string
   locale: string
   today: IsoDate
@@ -84,7 +82,6 @@ export function PartSheet({
   expenses,
   mods,
   categories,
-  icons,
   currency,
   locale,
   today,
@@ -309,7 +306,6 @@ export function PartSheet({
                 categoryId={categoryId}
                 onCategoryId={setCategoryId}
                 categories={categories}
-                icons={icons}
                 currency={currency}
                 locale={locale}
                 occurredOn={values.installedOn || today}

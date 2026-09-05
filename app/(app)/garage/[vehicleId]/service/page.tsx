@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import type { ReactNode } from 'react'
 
-import { categoryIconMap } from '@/components/expenses/category-icons'
 import { DueGauge } from '@/components/service/due-gauge'
 import { serviceIcons } from '@/components/service/service-icons'
 import { ServiceScreen } from '@/components/service/service-screen'
@@ -70,7 +69,6 @@ export default async function ServicePage({ params }: ServicePageProps) {
       gauges={gauges}
       icons={serviceIcons()}
       categories={categories}
-      categoryIcons={categoryIconMap(categories)}
       lastReading={vehicle.odometer_km}
       currency={preferences.baseCurrency}
       locale={preferences.locale}

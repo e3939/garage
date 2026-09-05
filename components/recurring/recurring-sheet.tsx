@@ -1,7 +1,7 @@
 // A form: a label, an amount, a cadence and a first due date.
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 
 import {
   createRecurringAction,
@@ -32,7 +32,6 @@ export type RecurringSheetProps = {
   mode: 'create' | 'edit'
   initial?: RecurringTemplate | null
   categories: readonly CategoryOption[]
-  icons: Record<string, ReactNode>
   vehicles: readonly VehicleOption[]
   currency: string
   locale: string
@@ -63,7 +62,6 @@ export function RecurringSheet({
   mode,
   initial,
   categories,
-  icons,
   vehicles,
   currency,
   locale,
@@ -210,7 +208,6 @@ export function RecurringSheet({
           <p className="text-label text-ink-muted">Category</p>
           <CategoryChips
             categories={categories}
-            icons={icons}
             value={categoryId}
             onChange={setCategoryId}
           />

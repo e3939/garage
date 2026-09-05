@@ -15,27 +15,12 @@
  * Skipped unless GARAGE_DB_TESTS is set. Run with `npm run test:db`.
  */
 
-import { execFileSync } from 'node:child_process'
-
 import { beforeAll, describe, expect, it } from 'vitest'
 
-const ENABLED = process.env.GARAGE_DB_TESTS === '1'
+import { DB_TESTS_ENABLED, readStack, type Stack } from '@/lib/supabase/test-stack'
 
-type Stack = { apiUrl: string; publishableKey: string; secretKey: string }
+
 type User = { id: string; token: string }
-
-function readStack(): Stack {
-  const raw = execFileSync('npx', ['supabase', 'status', '-o', 'json'], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'ignore'],
-  })
-  const status = JSON.parse(raw.slice(raw.indexOf('{'))) as Record<string, string>
-  return {
-    apiUrl: status.API_URL ?? 'http://127.0.0.1:54321',
-    publishableKey: status.PUBLISHABLE_KEY ?? status.ANON_KEY ?? '',
-    secretKey: status.SECRET_KEY ?? status.SERVICE_ROLE_KEY ?? '',
-  }
-}
 
 let stack: Stack
 let user: User
@@ -100,7 +85,7 @@ async function roundTrip(table: string, id: string): Promise<{ before: Row; afte
   return { before: before as Row, after: after as Row }
 }
 
-describe.skipIf(!ENABLED)('undo snapshots', () => {
+describe.skipIf(!DB_TESTS_ENABLED)('undo snapshots', () => {
   beforeAll(async () => {
     stack = readStack()
     user = await createUser('undo')

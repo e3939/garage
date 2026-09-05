@@ -1,4 +1,3 @@
-import { categoryIconMap } from '@/components/expenses/category-icons'
 import { VehicleFab } from '@/components/timeline/vehicle-fab'
 import { todayIso } from '@/lib/dates'
 import { fetchRankedCategories } from '@/lib/queries/categories'
@@ -41,7 +40,6 @@ export default async function VehicleFabSlot({ params }: VehicleFabSlotProps) {
       quickAdd={{
         userId,
         categories,
-        icons: categoryIconMap(categories),
         vehicles,
         currency: preferences.baseCurrency,
         locale: preferences.locale,

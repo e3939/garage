@@ -9,7 +9,6 @@ import { monthName } from '@/lib/dates-display'
 import type { IsoDate } from '@/lib/dates'
 import { BUCKET_LABEL, type CategoryOption } from '@/lib/expenses/types'
 import { parseAmount, parsedAmountHint } from '@/lib/money'
-import type { ReactNode } from 'react'
 
 export type LinkedExpenseFieldProps = {
   /** Whether the expense will be written at all. */
@@ -20,7 +19,6 @@ export type LinkedExpenseFieldProps = {
   categoryId: string
   onCategoryId: (next: string) => void
   categories: readonly CategoryOption[]
-  icons: Record<string, ReactNode>
   currency: string
   locale: string
   /** The expense's own date, which is the record's date, not today's. */
@@ -47,7 +45,6 @@ export function LinkedExpenseField({
   categoryId,
   onCategoryId,
   categories,
-  icons,
   currency,
   locale,
   occurredOn,
@@ -107,7 +104,6 @@ export function LinkedExpenseField({
             <p className="text-label text-ink-muted">Category</p>
             <CategoryChips
               categories={categories}
-              icons={icons}
               value={categoryId}
               onChange={onCategoryId}
             />

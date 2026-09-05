@@ -1,7 +1,7 @@
 // Rows with a toggle and a sheet, so the list holds which template is open.
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 
 import { setRecurringActiveAction } from '@/app/(app)/recurring/actions'
 import { RecurringSheet } from '@/components/recurring/recurring-sheet'
@@ -19,7 +19,6 @@ import type { RecurringTemplate } from '@/lib/recurring/types'
 export type RecurringListProps = {
   templates: readonly RecurringTemplate[]
   categories: readonly CategoryOption[]
-  icons: Record<string, ReactNode>
   vehicles: readonly VehicleOption[]
   currency: string
   locale: string
@@ -41,7 +40,6 @@ export type RecurringListProps = {
 export function RecurringList({
   templates,
   categories,
-  icons,
   vehicles,
   currency,
   locale,
@@ -150,7 +148,6 @@ export function RecurringList({
             mode={open.template ? 'edit' : 'create'}
             initial={open.template}
             categories={categories}
-            icons={icons}
             vehicles={vehicles}
             currency={currency}
             locale={locale}

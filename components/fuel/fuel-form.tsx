@@ -24,7 +24,6 @@ import type { CategoryOption } from '@/lib/expenses/types'
 import type { FuelLogWrite } from '@/lib/fuel/schema'
 import { pricePerLitre, type FuelLog } from '@/lib/fuel/types'
 import { formatAmount, parseAmount } from '@/lib/money'
-import type { ReactNode } from 'react'
 
 const AttachmentField = dynamic(
   () => import('@/components/attachments/attachment-field').then((module) => module.AttachmentField),
@@ -48,7 +47,6 @@ export type FuelFormProps = {
   /** The vehicle's last known reading, pre-filled on a new fill-up. */
   lastReading: number
   categories: readonly CategoryOption[]
-  icons: Record<string, ReactNode>
   currency: string
   locale: string
   today: IsoDate
@@ -88,7 +86,6 @@ export function FuelForm({
   initialAttachments,
   lastReading,
   categories,
-  icons,
   currency,
   locale,
   today,
@@ -324,7 +321,6 @@ export function FuelForm({
             categoryId={categoryId}
             onCategoryId={setCategoryId}
             categories={categories}
-            icons={icons}
             currency={currency}
             locale={locale}
             occurredOn={filledOn}

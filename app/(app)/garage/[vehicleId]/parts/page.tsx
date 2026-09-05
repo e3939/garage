@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
-import { categoryIconMap } from '@/components/expenses/category-icons'
 import { ICON_UI, Nut, Plus } from '@/components/icons'
 import { PartsScreen } from '@/components/parts/parts-screen'
 import { todayIso } from '@/lib/dates'
@@ -55,7 +54,6 @@ export default async function PartsPage({ params }: PartsPageProps) {
       expenses={expenses}
       mods={mods}
       categories={categories}
-      icons={categoryIconMap(categories)}
       addIcon={<Plus size={24} weight="bold" aria-hidden />}
       partIcon={<Nut {...ICON_UI} aria-hidden />}
       currency={preferences.baseCurrency}

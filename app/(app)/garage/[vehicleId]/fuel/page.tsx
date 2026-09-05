@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
-import { categoryIconMap } from '@/components/expenses/category-icons'
 import { ConsumptionChart } from '@/components/fuel/consumption-chart'
 import { FuelScreen } from '@/components/fuel/fuel-screen'
 import { FuelStats } from '@/components/fuel/fuel-stats'
@@ -75,7 +74,6 @@ export default async function FuelPage({ params }: FuelPageProps) {
           consumption={consumption}
           lastReading={vehicle.odometer_km}
           categories={categories}
-          icons={categoryIconMap(categories)}
           addIcon={<Plus size={24} weight="bold" aria-hidden />}
           currency={preferences.baseCurrency}
           locale={preferences.locale}

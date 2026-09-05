@@ -42,7 +42,6 @@ export type FuelScreenProps = {
   consumption: Record<string, ConsumptionInterval>
   lastReading: number
   categories: readonly CategoryOption[]
-  icons: Record<string, ReactNode>
   addIcon: ReactNode
   currency: string
   locale: string
@@ -65,7 +64,6 @@ export function FuelScreen({
   consumption,
   lastReading,
   categories,
-  icons,
   addIcon,
   currency,
   locale,
@@ -149,7 +147,6 @@ export function FuelScreen({
             initial={open === 'new' ? null : open}
             lastReading={lastReading}
             categories={categories}
-            icons={icons}
             currency={currency}
             locale={locale}
             today={today}

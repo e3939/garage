@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 
-import { categoryIconMap } from '@/components/expenses/category-icons'
 import { BuildSheet } from '@/components/mods/build-sheet'
 import { ModBoard } from '@/components/mods/mod-board'
 import { modIcons } from '@/components/mods/mod-icons'
@@ -86,7 +85,6 @@ export default async function PlanPage({ params }: PlanPageProps) {
         expense={{
           userId: userId ?? '',
           categories,
-          icons: categoryIconMap(categories),
           vehicles,
           currency: preferences.baseCurrency,
           locale: preferences.locale,

@@ -33,7 +33,6 @@ export type ServiceScreenProps = {
   gauges: Record<string, ReactNode>
   icons: ServiceIcons
   categories: readonly CategoryOption[]
-  categoryIcons: Record<string, ReactNode>
   lastReading: number
   currency: string
   locale: string
@@ -88,7 +87,6 @@ export function ServiceScreen({
   gauges,
   icons,
   categories,
-  categoryIcons,
   lastReading,
   currency,
   locale,
@@ -259,7 +257,6 @@ export function ServiceScreen({
             schedule={open.item}
             lastReading={lastReading}
             categories={categories}
-            icons={categoryIcons}
             currency={currency}
             locale={locale}
             today={today}

@@ -273,7 +273,6 @@ export function LedgerList({
             userId={userId}
             initialAttachments={photos}
             categories={categories}
-            icons={icons}
             vehicles={vehicles}
             currency={currency}
             locale={locale}

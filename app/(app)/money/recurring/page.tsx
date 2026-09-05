@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 
-import { categoryIconMap } from '@/components/expenses/category-icons'
 import { RecurringList } from '@/components/recurring/recurring-list'
 import { todayIso } from '@/lib/dates'
 import { dateLabel } from '@/lib/dates-display'
@@ -38,7 +37,6 @@ export default async function RecurringPage() {
       <RecurringList
         templates={templates}
         categories={categories}
-        icons={categoryIconMap(categories)}
         vehicles={vehicles}
         currency={preferences.baseCurrency}
         locale={preferences.locale}

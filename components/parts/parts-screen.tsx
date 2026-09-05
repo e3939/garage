@@ -45,7 +45,6 @@ export type PartsScreenProps = {
   expenses: readonly ExpenseOption[]
   mods: readonly ModOption[]
   categories: readonly CategoryOption[]
-  icons: Record<string, ReactNode>
   addIcon: ReactNode
   partIcon: ReactNode
   currency: string
@@ -77,7 +76,6 @@ export function PartsScreen({
   expenses,
   mods,
   categories,
-  icons,
   addIcon,
   partIcon,
   currency,
@@ -205,7 +203,6 @@ export function PartsScreen({
             expenses={expenses}
             mods={mods}
             categories={categories}
-            icons={icons}
             currency={currency}
             locale={locale}
             today={today}

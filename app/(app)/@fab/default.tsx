@@ -1,5 +1,4 @@
 import { QuickAdd } from '@/components/expenses/quick-add'
-import { categoryIconMap } from '@/components/expenses/category-icons'
 import { todayIso } from '@/lib/dates'
 import { fetchRankedCategories } from '@/lib/queries/categories'
 import { fetchAmortiseThreshold } from '@/lib/queries/expenses'
@@ -31,7 +30,6 @@ export default async function DefaultFab() {
     <QuickAdd
       userId={userId}
       categories={categories}
-      icons={categoryIconMap(categories)}
       vehicles={vehicles}
       currency={preferences.baseCurrency}
       locale={preferences.locale}

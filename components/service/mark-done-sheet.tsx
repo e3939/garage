@@ -16,7 +16,6 @@ import type { CategoryOption } from '@/lib/expenses/types'
 import { parseAmount } from '@/lib/money'
 import type { ServiceRecordWrite } from '@/lib/service/schema'
 import type { ServiceDue } from '@/lib/service/types'
-import type { ReactNode } from 'react'
 
 const AttachmentField = dynamic(
   () => import('@/components/attachments/attachment-field').then((module) => module.AttachmentField),
@@ -39,7 +38,6 @@ export type MarkDoneSheetProps = {
   /** The vehicle's last known reading, pre-filled and editable. */
   lastReading: number
   categories: readonly CategoryOption[]
-  icons: Record<string, ReactNode>
   currency: string
   locale: string
   today: IsoDate
@@ -77,7 +75,6 @@ export function MarkDoneSheet({
   schedule,
   lastReading,
   categories,
-  icons,
   currency,
   locale,
   today,
@@ -207,7 +204,6 @@ export function MarkDoneSheet({
           categoryId={categoryId}
           onCategoryId={setCategoryId}
           categories={categories}
-          icons={icons}
           currency={currency}
           locale={locale}
           occurredOn={performedOn}

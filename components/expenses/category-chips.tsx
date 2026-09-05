@@ -1,14 +1,12 @@
 // Chip selection is form state.
 'use client'
 
-import { useMemo, type ReactNode } from 'react'
+import { useMemo } from 'react'
 import { Chip } from '@/components/ui/chip'
 import type { CategoryOption } from '@/lib/expenses/types'
 
 type CategoryChipsProps = {
   categories: readonly CategoryOption[]
-  /** Icons are rendered by a Server Component and handed over already drawn. */
-  icons: Record<string, ReactNode>
   value: string
   onChange: (categoryId: string) => void
 }
@@ -28,8 +26,17 @@ type CategoryChipsProps = {
  * where it can be overridden.
  *
  * The partition is stable, so a category never moves within its group.
+ *
+ * No icon in these chips, unlike every other chip in the app. Grouping split
+ * one flow into two ragged ones and cost a row back; the 20px glyph and its gap
+ * were 24px of the roughly 100px each chip took, and dropping them is what
+ * brings fourteen categories back inside the sheet without pushing Save under
+ * the fold. The category still carries its own colour on the outline and its
+ * name in words, which is what docs/03-DESIGN.md actually requires — colour
+ * never carries meaning alone. The icon is still the category's own everywhere
+ * it has room: the ledger row, the filter bar, the settings list.
  */
-export function CategoryChips({ categories, icons, value, onChange }: CategoryChipsProps) {
+export function CategoryChips({ categories, value, onChange }: CategoryChipsProps) {
   const groups = useMemo(() => {
     const life = categories.filter((category) => category.default_bucket === 'life')
     const car = categories.filter((category) => category.default_bucket !== 'life')
@@ -54,7 +61,6 @@ export function CategoryChips({ categories, icons, value, onChange }: CategoryCh
                 accent={category.colour_hex}
                 onSelect={() => onChange(value === category.id ? '' : category.id)}
               >
-                {icons[category.icon] ?? null}
                 {category.name}
               </Chip>
             ))}

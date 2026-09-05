@@ -2,7 +2,7 @@
 // and handing the write to the optimistic queue.
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
@@ -79,8 +79,6 @@ export type ExpenseFormProps = {
   /** Only read on a create. An edit starts from the row it is editing. */
   prefill?: ExpensePrefill
   categories: readonly CategoryOption[]
-  /** Category icons, drawn by a Server Component so Phosphor stays off the wire. */
-  icons: Record<string, ReactNode>
   vehicles: readonly VehicleOption[]
   currency: string
   locale: string
@@ -171,7 +169,6 @@ export function ExpenseForm({
   initial,
   prefill,
   categories,
-  icons,
   vehicles,
   currency,
   locale,
@@ -499,7 +496,6 @@ export function ExpenseForm({
           <p className="text-label text-ink-muted">Category</p>
           <CategoryChips
             categories={categories}
-            icons={icons}
             value={values.categoryId}
             onChange={chooseCategory}
           />
