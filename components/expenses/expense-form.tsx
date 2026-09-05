@@ -481,16 +481,31 @@ export function ExpenseForm({
             whenever it is set, so promoting it costs no schema and makes the
             row read as something you wrote rather than a category name. Still
             optional: amount, category, save is untouched. */}
-        <Field label="What was this" htmlFor="expense-merchant">
-          <input
-            id="expense-merchant"
-            className={INPUT_CLASS}
-            autoComplete="off"
-            enterKeyHint="next"
-            placeholder="Oil change, groceries, coilovers"
-            {...register('merchant')}
-          />
-        </Field>
+        {/* Ngày đứng cạnh tên chứ không xuống dòng riêng: gộp vào một hàng
+            hai cột nên nó không tốn thêm một milimet chiều cao nào so với khi
+            còn nằm trong More, mà vẫn sửa được ngay. Field đã có min-w-0 nên ô
+            input không tự đẩy cột rộng ra khỏi sheet. */}
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="What was this" htmlFor="expense-merchant">
+            <input
+              id="expense-merchant"
+              className={INPUT_CLASS}
+              autoComplete="off"
+              enterKeyHint="next"
+              placeholder="Oil change"
+              {...register('merchant')}
+            />
+          </Field>
+
+          <Field label="Date" htmlFor="expense-date">
+            <input
+              id="expense-date"
+              type="date"
+              className={`${INPUT_CLASS} font-mono`}
+              {...register('occurredOn')}
+            />
+          </Field>
+        </div>
 
         <div className="space-y-2">
           <CategoryChips
@@ -584,15 +599,6 @@ export function ExpenseForm({
                 occurredOn={occurredOn}
               />
             )}
-
-            <Field label="Date" htmlFor="expense-date">
-              <input
-                id="expense-date"
-                type="date"
-                className={`${INPUT_CLASS} font-mono`}
-                {...register('occurredOn')}
-              />
-            </Field>
 
             <Field label="Note" htmlFor="expense-note">
               <textarea
