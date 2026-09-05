@@ -26,6 +26,8 @@ export type LedgerFilters = {
   search: string
 }
 
+import type { SpendView } from '@/lib/views'
+
 export const EMPTY_FILTERS: LedgerFilters = {
   from: null,
   to: null,
@@ -36,6 +38,29 @@ export const EMPTY_FILTERS: LedgerFilters = {
   amountMin: null,
   amountMax: null,
   search: '',
+}
+
+/**
+ * The Latest list on /today, narrowed to the view the switcher is showing.
+ *
+ * The switcher used to move the hero figure and leave the list alone, so
+ * "Car only" printed a car total over a list that still had the groceries in
+ * it — the exact ambiguity docs/01-PRODUCT.md says destroys the point of having
+ * three views.
+ *
+ * `car_only` is every bucket beginning `car_`, ignoring the budget switch,
+ * which is what that view means. `all_in` is everything, so it filters nothing.
+ *
+ * `monthly` cannot be expressed here: it means `counts_toward_budget = true`,
+ * and `ledger_page` takes no such parameter — adding one is a migration. The
+ * monthly list therefore still shows rows that are kept out of the budget. The
+ * figure above it is right either way, because that comes from `v_month_totals`.
+ */
+export function filtersForView(view: SpendView): LedgerFilters {
+  if (view === 'car_only') {
+    return { ...EMPTY_FILTERS, buckets: ['car_running', 'car_project'] }
+  }
+  return EMPTY_FILTERS
 }
 
 /** Next hands search params through as this shape. */

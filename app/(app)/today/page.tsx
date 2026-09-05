@@ -12,7 +12,7 @@ import { ledgerSignalIcons } from '@/components/ledger/row-signals'
 import { ViewSwitcher } from '@/components/totals/view-switcher'
 import { monthStart, todayIso } from '@/lib/dates'
 import { dateLabel, monthLabel } from '@/lib/dates-display'
-import { EMPTY_FILTERS, type RawSearchParams } from '@/lib/expenses/filters'
+import { filtersForView, type RawSearchParams } from '@/lib/expenses/filters'
 import { fetchRankedCategories } from '@/lib/queries/categories'
 import { fetchAmortiseThreshold, fetchLedgerPage, fetchMonthSummary } from '@/lib/queries/expenses'
 import { fetchProfilePreferences, fetchUserId } from '@/lib/queries/profile'
@@ -45,7 +45,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
   const [summary, recent, categories, vehicles, amortiseThreshold, userId, drafts] =
     await Promise.all([
       fetchMonthSummary(month, preferences.baseCurrency),
-      fetchLedgerPage(EMPTY_FILTERS, null, RECENT_ROWS),
+      fetchLedgerPage(filtersForView(view), null, RECENT_ROWS),
       fetchRankedCategories(),
       fetchVehicleOptions(),
       fetchAmortiseThreshold(),
@@ -86,7 +86,7 @@ export default async function TodayPage({ searchParams }: TodayPageProps) {
               // The panel is a window on the ledger, not a page of it: paging
               // happens over on /ledger, so this copy never offers to load more.
               page={{ rows: recent.rows, cursor: null, hasMore: false }}
-              filters={EMPTY_FILTERS}
+              filters={filtersForView(view)}
               categories={categories}
               icons={categoryIconMap(categories)}
               signals={ledgerSignalIcons()}
