@@ -475,6 +475,26 @@ export function ExpenseForm({
           </div>
         ) : null}
 
+        {/* `merchant` is the column, but nobody types "merchant" into a form —
+            they type what the thing was. It is already the ledger row's title
+            whenever it is set, so promoting it costs no schema and makes the
+            row read as something you wrote rather than a category name. Still
+            optional: amount, category, save is untouched. */}
+        <Field
+          label="What was this"
+          htmlFor="expense-merchant"
+          hint="Optional. Becomes the row's title in the ledger."
+        >
+          <input
+            id="expense-merchant"
+            className={INPUT_CLASS}
+            autoComplete="off"
+            enterKeyHint="next"
+            placeholder="Oil change, groceries, coilovers"
+            {...register('merchant')}
+          />
+        </Field>
+
         <div className="space-y-2">
           <p className="text-label text-ink-muted">Category</p>
           <CategoryChips
@@ -576,15 +596,6 @@ export function ExpenseForm({
                 type="date"
                 className={`${INPUT_CLASS} font-mono`}
                 {...register('occurredOn')}
-              />
-            </Field>
-
-            <Field label="Merchant" htmlFor="expense-merchant">
-              <input
-                id="expense-merchant"
-                className={INPUT_CLASS}
-                autoComplete="off"
-                {...register('merchant')}
               />
             </Field>
 

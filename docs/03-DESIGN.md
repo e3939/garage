@@ -164,6 +164,11 @@ still honour them, which is an accessibility regression in exchange for nothing.
 
 - Radius: `--r-sm: 6px`, `--r-md: 10px`, `--r-lg: 14px`, `--r-full: 999px`. Nothing larger —
   the paper metaphor has folds, not pills.
+- **Radius follows surface size.** `--r-lg` for cards and sheets, `--r-md` for inputs and
+  buttons, `--r-sm` for chips. `--r-full` is reserved for things that are actually round —
+  the FAB, colour swatches, progress tracks, the segmented-control track — and is never used
+  on something with a text label in it. Chips were fully rounded and read as a bag of sweets:
+  fourteen of them took most of the quick-add sheet and pushed Save off the screen.
 - Spacing scale: 4 / 8 / 12 / 16 / 20 / 24 / 32 / 48. Nothing between.
 - Elevation is mostly **rules and tint**, not shadow. One shadow token exists,
   `--shadow-sheet: 0 -8px 32px rgba(42,38,32,0.12)`, used only on bottom sheets and modals.
@@ -260,9 +265,17 @@ is the only playful thing in the ledger; the rows themselves stay strictly align
   is behind a "More" disclosure.
 - **View switcher** (Monthly / All-in / Car only) is a segmented control pinned under the
   header on any screen showing totals. Its state persists in the URL and in `profiles`.
-- **Bucket chips** are small, outlined, and always carry the bucket colour. On the expense
-  form the budget-impact switch sits directly beneath and shows plain-language state:
+- **Chips** — category, bucket, album, filter — are one component. `--r-sm`, an 8px
+  horizontal pad, a 4px gap to the next chip, and the 44px touch floor kept on the height.
+  Small, outlined, always carrying their own colour, and always carrying text as well,
+  because colour never carries meaning alone.
+- **Bucket chips** are chips that carry the bucket colour. On the expense form the
+  budget-impact switch sits directly beneath and shows plain-language state:
   "Counts toward August" / "Kept out of August".
+- **Category chips are grouped by bucket**, life first and car after, with an `eyebrow` label
+  over each group. Life is the everyday spend and is what someone is logging while standing
+  in a shop; car spend is deliberate and gets looked for. Ranking by most recent use still
+  applies, one level down, inside each group.
 - **Empty states** use a Duotone icon at 32px, one sentence of direction, one button.
 - **Skeletons**, not spinners. Skeletons are `--paper-sink` with no shimmer.
 - **Toasts** appear bottom-centre above the FAB, 2.4s, with an Undo action on every

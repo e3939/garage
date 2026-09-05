@@ -176,7 +176,7 @@ export function GalleryScreen({
       />
 
       {albums.length > 0 || photos.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1">
           <FilterChip active={albumFilter === 'all'} onClick={() => setAlbumFilter('all')}>
             All · {photos.length}
           </FilterChip>
@@ -363,7 +363,7 @@ function FilterChip({
       onClick={onClick}
       aria-pressed={active}
       className={[
-        'min-h-touch rounded-full border px-3 text-label',
+        'min-h-touch rounded-sm border px-2 text-label',
         active ? 'border-accent bg-accent text-accent-ink' : 'border-border-strong text-ink-muted',
       ].join(' ')}
     >
