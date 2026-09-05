@@ -425,7 +425,11 @@ export function ExpenseForm({
         <Field
           label="Amount"
           htmlFor="expense-amount"
-          hint={hint ?? 'Type 150k or 1.2m if that is quicker.'}
+          /* Only the live parsed value. The static "type 150k" line was 21px
+             of the sheet's resting height and said the same thing the
+             placeholder does; the echo docs/01-PRODUCT.md asks for appears the
+             moment there is something to echo. */
+          hint={hint}
           error={formError}
         >
           <AmountInput
@@ -477,11 +481,7 @@ export function ExpenseForm({
             whenever it is set, so promoting it costs no schema and makes the
             row read as something you wrote rather than a category name. Still
             optional: amount, category, save is untouched. */}
-        <Field
-          label="What was this"
-          htmlFor="expense-merchant"
-          hint="Optional. Becomes the row's title in the ledger."
-        >
+        <Field label="What was this" htmlFor="expense-merchant">
           <input
             id="expense-merchant"
             className={INPUT_CLASS}
@@ -493,7 +493,6 @@ export function ExpenseForm({
         </Field>
 
         <div className="space-y-2">
-          <p className="text-label text-ink-muted">Category</p>
           <CategoryChips
             categories={categories}
             value={values.categoryId}
@@ -644,8 +643,13 @@ export function ExpenseForm({
         </details>
       </div>
 
+      {/* pt-2 rather than py-3: the button carries its own 44px target, so the
+          12px above it was separating a rule from a control that does not need
+          separating. The 4px reclaimed goes to the scrolling body above, which
+          is where the sheet is actually short. The bottom keeps its 12px plus
+          the home indicator. */}
       <div
-        className="border-t border-border bg-surface px-4 py-3"
+        className="border-t border-border bg-surface px-4 pt-2"
         style={{ paddingBottom: 'calc(var(--space-3) + env(safe-area-inset-bottom))' }}
       >
         <Button type="submit" variant="primary" className="w-full" disabled={formState.isSubmitting}>
