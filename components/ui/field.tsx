@@ -41,7 +41,11 @@ export function Field({ label, htmlFor, hint, error, children, className = '' }:
  * focused control is under 16px and never zooms back out.
  */
 export const INPUT_CLASS = [
-  'w-full min-h-touch rounded-md border border-border-strong bg-surface px-3',
+  // `min-w-0` alongside `w-full`: an input's own min-width is `auto`, so in a
+  // grid or flex column it refuses to shrink below its intrinsic width however
+  // wide you say it is. A native date input on iOS is intrinsically wider than
+  // half a 390pt sheet, which is how it ran off the right edge.
+  'w-full min-w-0 min-h-touch rounded-md border border-border-strong bg-surface px-3',
   'text-input text-ink placeholder:text-ink-faint',
   'outline-none',
 ].join(' ')
